@@ -52,7 +52,7 @@ development_status:
   1-1-initialiser-application-nextjs-charte-existante: done
   1-2-provisionner-supabase-schema-rls-realtime: review
   1-3-connecter-app-supabase-lecture-cle-low-privilege: review
-  1-4-proxy-ecriture-serveur-garde-par-passphrase: backlog
+  1-4-proxy-ecriture-serveur-garde-par-passphrase: review
   1-5-tranche-verticale-participants-deploiement-vercel: backlog
   epic-1-retrospective: optional
   epic-2: backlog

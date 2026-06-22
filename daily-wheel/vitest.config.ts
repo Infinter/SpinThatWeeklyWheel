@@ -8,6 +8,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('.', import.meta.url)),
+      // `server-only` jette à l'import hors graphe React Server → stub neutre pour les tests
+      // (la vraie garde reste active au `npm run build`). Story 1.4.
+      'server-only': fileURLToPath(new URL('./tests/server-only.stub.ts', import.meta.url)),
     },
   },
   test: {
