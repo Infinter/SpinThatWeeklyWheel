@@ -16,54 +16,19 @@ import {
   writeParticipant,
   WriteError,
   type Participant,
+  type WriteOp,
+  type WritePayload,
 } from '@/lib/data/participants'
-import { reconcileParticipants, type ParticipantChangeEvent } from '@/lib/store/reconcile'
+import { type ParticipantChangeEvent } from '@/lib/store/reconcile'
+import { participantsReducer, type StoreParticipant } from '@/lib/store/participants-reducer'
 import { parseNames } from '@/lib/store/parse-names'
 
 // Store client de la tranche verticale « participants » (Story 1.5).
 // UI → store → lib/data/ (AD-11) : aucun composant ne touche `supabase.from(...)` ni `fetch('/api/...')`.
 // Le SEUL accès Supabase direct ici est l'ABONNEMENT Realtime de lecture via `supabasePublic` (AD-6/AD-7).
 
-// ── Modèle d'état ─────────────────────────────────────────────────────────
-// Une ligne du store = un Participant serveur + des drapeaux client-only :
-//   pending : écriture optimiste en vol (AD-5) ; failed : dernière écriture échouée (retry possible, AD-17 transient).
-export type StoreParticipant = Participant & { pending?: boolean; failed?: boolean }
-
-type Action =
-  | { type: 'HYDRATE'; rows: Participant[] }
-  | { type: 'REALTIME'; event: ParticipantChangeEvent }
-  | { type: 'ADD_OPTIMISTIC'; tempId: string; name: string }
-  | { type: 'SET_PENDING'; tempId: string }
-  | { type: 'CONFIRM'; tempId: string; row: Participant }
-  | { type: 'ROLLBACK'; tempId: string }
-  | { type: 'MARK_FAILED'; tempId: string }
-
-function reducer(state: StoreParticipant[], action: Action): StoreParticipant[] {
-  switch (action.type) {
-    case 'HYDRATE':
-      // Re-synchronise sur la source canonique (AD-4) : les drapeaux optimistes sont abandonnés.
-      return action.rows
-    case 'REALTIME':
-      // Réconciliation pure (AD-15/AD-16) ; les StoreParticipant non touchés conservent leurs drapeaux.
-      return reconcileParticipants(state, action.event) as StoreParticipant[]
-    case 'ADD_OPTIMISTIC':
-      return [
-        ...state,
-        { id: action.tempId, name: action.name, active: true, created_at: '', updated_at: '', pending: true },
-      ]
-    case 'SET_PENDING':
-      return state.map((r) => (r.id === action.tempId ? { ...r, pending: true, failed: false } : r))
-    case 'CONFIRM':
-      // Remplace la ligne temp par la ligne serveur (id réel + updated_at réel) → l'écho Realtime sera dédupliqué (AD-15).
-      return state.map((r) => (r.id === action.tempId ? action.row : r))
-    case 'ROLLBACK':
-      return state.filter((r) => r.id !== action.tempId)
-    case 'MARK_FAILED':
-      return state.map((r) => (r.id === action.tempId ? { ...r, pending: false, failed: true } : r))
-    default:
-      return state
-  }
-}
+// Modèle d'état, type `Action` et `participantsReducer` (pur) : extraits dans
+// `lib/store/participants-reducer.ts` (Story 2.2) → testés sans réseau ni env (AD-13).
 
 // ── Passphrase (AD-8) : saisie dans l'UI, mémorisée en sessionStorage (onglet courant) ──────
 // JAMAIS une variable NEXT_PUBLIC_ ; JAMAIS loggée ; effacée sur 401.
@@ -79,11 +44,30 @@ function clearPassphrase(): void {
   if (typeof window !== 'undefined') window.sessionStorage.removeItem(PASSPHRASE_KEY)
 }
 
+// Drapeau-snapshot vers ligne serveur (sans pending/failed) pour les rollbacks RESTORE (Story 2.2).
+function toServerRow(p: StoreParticipant): Participant {
+  return { id: p.id, name: p.name, active: p.active, created_at: p.created_at, updated_at: p.updated_at }
+}
+
+// Spécification d'une écriture serveur, consommée par le runWrite générique (insert/update/delete).
+// Mise en file (passphrase) ou conservée pour le retry telle quelle ; `submit`/`retry` la rejouent (Story 2.2).
+type WriteSpec = {
+  optimisticId: string | null // ligne à marquer pending/failed (tempId pour insert, id pour update ; null pour delete)
+  op: WriteOp
+  payload: WritePayload
+  rollback: () => void // annule l'optimiste (insert→ROLLBACK ; update/delete→RESTORE snapshot)
+  onConfirm: (row: Participant) => void // succès : applique la ligne serveur (CONFIRM) ; delete → no-op
+  deleteIdempotent?: boolean // delete : 409 « introuvable » = déjà supprimé ailleurs → succès idempotent (AD-16)
+}
+
 // ── Contexte exposé ─────────────────────────────────────────────────────────
 type StoreValue = {
   participants: StoreParticipant[]
   addParticipants: (raw: string) => void
-  retryParticipant: (tempId: string) => void
+  toggleActive: (id: string) => void
+  renameParticipant: (id: string, newName: string) => void
+  deleteParticipant: (id: string) => void
+  retryParticipant: (id: string) => void
   error: string | null
   clearError: () => void
   passphraseNeeded: boolean
@@ -100,54 +84,66 @@ export function ParticipantsStoreProvider({
   initial: Participant[]
   children: ReactNode
 }) {
-  const [participants, dispatch] = useReducer(reducer, initial as StoreParticipant[])
+  const [participants, dispatch] = useReducer(participantsReducer, initial as StoreParticipant[])
   const [error, setError] = useState<string | null>(null)
   const [passphraseNeeded, setPassphraseNeeded] = useState(false)
 
-  const seqRef = useRef(0)
-  // Écritures en attente d'une passphrase (1er ajout sans passphrase, ou re-prompt après 401) → rejouées après saisie.
-  const pendingWritesRef = useRef<Map<string, { name: string }>>(new Map())
-  // Miroir de l'état pour `retryParticipant` (lecture du nom hors closure, depuis un handler).
+  const seqRef = useRef(0) // ids temporaires d'insert (`temp:<n>`).
+  const writeSeqRef = useRef(0) // clés uniques de file passphrase (`w:<n>`).
+  // Écritures en attente d'une passphrase (sans passphrase, ou re-prompt après 401) → rejouées après saisie (AC5).
+  const pendingWritesRef = useRef<Map<string, WriteSpec>>(new Map())
+  // Dernière écriture ÉCHOUÉE (transient) par id de ligne → rejouée par `retryParticipant` (AC5).
+  const failedWritesRef = useRef<Map<string, WriteSpec>>(new Map())
+  // Miroir de l'état pour lire un snapshot de ligne hors closure (toggle/rename/delete/retry).
   const stateRef = useRef(participants)
   useEffect(() => {
     stateRef.current = participants
   }, [participants])
 
-  // Exécute l'écriture serveur pour une ligne optimiste déjà présente dans le store.
-  const runWrite = useCallback(async (tempId: string, name: string) => {
+  // Écriture serveur GÉNÉRIQUE (insert/update/delete) portant la taxonomie d'erreurs AD-17.
+  // Le caller a DÉJÀ appliqué l'optimiste (ADD_OPTIMISTIC / PATCH_OPTIMISTIC / REMOVE) et fourni le rollback.
+  const runWrite = useCallback(async (spec: WriteSpec) => {
+    const writeKey = `w:${writeSeqRef.current++}`
     const passphrase = readPassphrase()
     if (!passphrase) {
-      // Demande paresseuse : on garde l'optimiste, on met l'écriture en file, on ouvre le prompt (AC5).
-      pendingWritesRef.current.set(tempId, { name })
+      // Demande paresseuse : on garde l'optimiste, on met l'écriture en file, on ouvre UN seul prompt (AC5).
+      pendingWritesRef.current.set(writeKey, spec)
       setPassphraseNeeded(true)
       return
     }
-    dispatch({ type: 'SET_PENDING', tempId })
+    if (spec.optimisticId) dispatch({ type: 'SET_PENDING', tempId: spec.optimisticId })
     try {
-      const row = (await writeParticipant('insert', { data: { name } }, passphrase)) as Participant
-      pendingWritesRef.current.delete(tempId)
-      dispatch({ type: 'CONFIRM', tempId, row })
+      const row = (await writeParticipant(spec.op, spec.payload, passphrase)) as Participant
+      if (spec.optimisticId) failedWritesRef.current.delete(spec.optimisticId)
+      spec.onConfirm(row)
     } catch (e) {
       if (!(e instanceof WriteError)) {
-        dispatch({ type: 'MARK_FAILED', tempId })
-        setError('Erreur inattendue lors de l’ajout. Réessayez.')
+        if (spec.optimisticId) {
+          dispatch({ type: 'MARK_FAILED', tempId: spec.optimisticId })
+          failedWritesRef.current.set(spec.optimisticId, spec)
+        } else {
+          spec.rollback()
+        }
+        setError('Erreur inattendue lors de l’écriture. Réessayez.')
         return
       }
-      // Consommation de la taxonomie d'erreurs (AD-17).
+      // Taxonomie d'erreurs d'écriture (AD-17).
       switch (e.kind) {
         case 'auth': // 401 : passphrase invalide → effacer, re-prompt, rejouer après saisie (AC5).
           clearPassphrase()
-          pendingWritesRef.current.set(tempId, { name })
-          dispatch({ type: 'SET_PENDING', tempId })
+          pendingWritesRef.current.set(writeKey, spec)
+          if (spec.optimisticId) dispatch({ type: 'SET_PENDING', tempId: spec.optimisticId })
           setPassphraseNeeded(true)
           break
         case 'validation': // 400 : rollback de l'optimiste + message.
-          pendingWritesRef.current.delete(tempId)
-          dispatch({ type: 'ROLLBACK', tempId })
+          spec.rollback()
           setError(e.message)
           break
-        case 'conflict': // 409 : re-hydrater, l'état serveur fait autorité (AD-16).
-          pendingWritesRef.current.delete(tempId)
+        case 'conflict': // 409.
+          if (spec.deleteIdempotent) {
+            // delete : ligne déjà absente côté serveur → déjà supprimée ailleurs = succès idempotent (AD-16).
+            break
+          }
           try {
             const rows = await fetchParticipants()
             dispatch({ type: 'HYDRATE', rows })
@@ -156,22 +152,36 @@ export function ParticipantsStoreProvider({
           }
           setError('Conflit détecté — état resynchronisé avec le serveur.')
           break
-        case 'transient': // 5xx : on garde l'optimiste, bouton « réessayer ».
-          dispatch({ type: 'MARK_FAILED', tempId })
-          setError('Échec temporaire — vous pouvez réessayer.')
+        case 'transient': // 5xx.
+          if (spec.optimisticId) {
+            // insert/update : on garde l'optimiste + bouton « Réessayer » (rejoue l'op d'origine, AC5).
+            dispatch({ type: 'MARK_FAILED', tempId: spec.optimisticId })
+            failedWritesRef.current.set(spec.optimisticId, spec)
+            setError('Échec temporaire — vous pouvez réessayer.')
+          } else {
+            // delete : la ligne a déjà disparu → on la restaure et on invite à recommencer.
+            spec.rollback()
+            setError('Échec temporaire de la suppression — réessayez.')
+          }
           break
       }
     }
   }, [])
 
-  // Chemin INTERNE par nom : crée une ligne optimiste + déclenche l'écriture (réutilisé par addParticipants).
+  // Chemin INTERNE par nom : crée une ligne optimiste + déclenche l'insert (réutilisé par addParticipants).
   const addParticipant = useCallback(
     (rawName: string) => {
       const name = rawName.trim()
       if (!name) return // nom vide après trim → aucune écriture.
       const tempId = `temp:${seqRef.current++}`
       dispatch({ type: 'ADD_OPTIMISTIC', tempId, name })
-      void runWrite(tempId, name)
+      void runWrite({
+        optimisticId: tempId,
+        op: 'insert',
+        payload: { data: { name } },
+        rollback: () => dispatch({ type: 'ROLLBACK', tempId }),
+        onConfirm: (row) => dispatch({ type: 'CONFIRM', tempId, row }),
+      })
     },
     [runWrite],
   )
@@ -186,11 +196,74 @@ export function ParticipantsStoreProvider({
     [addParticipant],
   )
 
+  // Bascule actif/inactif (FR2) : optimiste (PATCH) + update patch partiel ; rollback = RESTORE du snapshot.
+  const toggleActive = useCallback(
+    (id: string) => {
+      const snapshot = stateRef.current.find((r) => r.id === id)
+      if (!snapshot) return
+      const nextActive = !snapshot.active
+      const restore = toServerRow(snapshot)
+      dispatch({ type: 'PATCH_OPTIMISTIC', id, patch: { active: nextActive } })
+      void runWrite({
+        optimisticId: id,
+        op: 'update',
+        payload: { id, data: { active: nextActive } },
+        rollback: () => dispatch({ type: 'RESTORE', row: restore }),
+        onConfirm: (row) => dispatch({ type: 'CONFIRM', tempId: id, row }),
+      })
+    },
+    [runWrite],
+  )
+
+  // Renommage inline (FR3, UX-DR3) : no-op si vide ou identique ; sinon optimiste + update.
+  const renameParticipant = useCallback(
+    (id: string, newName: string) => {
+      const name = newName.trim()
+      const snapshot = stateRef.current.find((r) => r.id === id)
+      if (!snapshot) return
+      if (name === '' || name === snapshot.name) return // aucune écriture.
+      const restore = toServerRow(snapshot)
+      dispatch({ type: 'PATCH_OPTIMISTIC', id, patch: { name } })
+      void runWrite({
+        optimisticId: id,
+        op: 'update',
+        payload: { id, data: { name } },
+        rollback: () => dispatch({ type: 'RESTORE', row: restore }),
+        onConfirm: (row) => dispatch({ type: 'CONFIRM', tempId: id, row }),
+      })
+    },
+    [runWrite],
+  )
+
+  // Suppression (FR4) : la confirmation est demandée côté UI (AC6) ; ici optimiste REMOVE + delete serveur.
+  // La suppression des indisponibilités liées est assurée par ON DELETE CASCADE au niveau DB (aucun code ici).
+  const deleteParticipant = useCallback(
+    (id: string) => {
+      const snapshot = stateRef.current.find((r) => r.id === id)
+      if (!snapshot) return
+      const restore = toServerRow(snapshot)
+      dispatch({ type: 'REMOVE', id })
+      void runWrite({
+        optimisticId: null,
+        op: 'delete',
+        payload: { id },
+        rollback: () => dispatch({ type: 'RESTORE', row: restore }),
+        onConfirm: () => {
+          /* delete : la ligne est déjà retirée ; l'écho Realtime DELETE est un no-op (AD-15). */
+        },
+        deleteIdempotent: true,
+      })
+    },
+    [runWrite],
+  )
+
+  // Rejoue la dernière écriture ÉCHOUÉE (transient) d'une ligne — l'op D'ORIGINE, pas un insert (AC5).
   const retryParticipant = useCallback(
-    (tempId: string) => {
-      const row = stateRef.current.find((r) => r.id === tempId)
-      if (!row) return
-      void runWrite(tempId, row.name)
+    (id: string) => {
+      const spec = failedWritesRef.current.get(id)
+      if (!spec) return
+      failedWritesRef.current.delete(id)
+      void runWrite(spec)
     },
     [runWrite],
   )
@@ -201,20 +274,20 @@ export function ParticipantsStoreProvider({
       if (!v) return
       storePassphrase(v)
       setPassphraseNeeded(false)
-      // Rejoue toutes les écritures mises en file pendant l'absence de passphrase (AC5).
-      const queued = Array.from(pendingWritesRef.current.entries())
+      // Rejoue TOUTES les écritures en file pendant l'absence de passphrase — un seul prompt pour N (AC5).
+      const queued = Array.from(pendingWritesRef.current.values())
       pendingWritesRef.current.clear()
-      for (const [tempId, { name }] of queued) void runWrite(tempId, name)
+      for (const spec of queued) void runWrite(spec)
     },
     [runWrite],
   )
 
   const cancelPassphrase = useCallback(() => {
     setPassphraseNeeded(false)
-    // Annulation : on rollback les optimistes en attente de passphrase.
-    const queued = Array.from(pendingWritesRef.current.keys())
+    // Annulation : rollback de chaque optimiste en attente (insert→remove, update/delete→restore).
+    const queued = Array.from(pendingWritesRef.current.values())
     pendingWritesRef.current.clear()
-    for (const tempId of queued) dispatch({ type: 'ROLLBACK', tempId })
+    for (const spec of queued) spec.rollback()
   }, [])
 
   const clearError = useCallback(() => setError(null), [])
@@ -251,6 +324,9 @@ export function ParticipantsStoreProvider({
   const value: StoreValue = {
     participants,
     addParticipants,
+    toggleActive,
+    renameParticipant,
+    deleteParticipant,
     retryParticipant,
     error,
     clearError,

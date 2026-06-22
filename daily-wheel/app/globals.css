@@ -195,23 +195,55 @@ button:disabled:hover { filter: none; box-shadow: none; }
 .participant-name { font-size: .95em; }
 .participant-active { width: 1%; white-space: nowrap; }
 .participant-actions { width: 1%; white-space: nowrap; text-align: right; }
-/* Badge d'état actif (lecture seule en 2.1 ; le toggle interactif arrive en 2.2). */
-.badge-active,
-.badge-inactive {
-  display: inline-block;
-  padding: .15em .55em;
-  font-size: .8em;
-  border-radius: var(--radius-sm);
+/* Toggle actif/inactif (Story 2.2) : checkbox stylée en switch, charte primaire (sans dégradé). */
+.toggle-active {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 2.4em;
+  height: 1.3em;
+  border-radius: 1em;
+  background: var(--border);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: background .12s;
+  box-shadow: none;
 }
-.badge-active { color: var(--primary-dark); background: var(--primary-light); }
-.badge-inactive { color: var(--text-muted); background: var(--card-bg); border: 1px solid var(--border); }
+.toggle-active::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: .15em;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateY(-50%);
+  transition: left .12s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+}
+.toggle-active:checked { background: var(--primary); border-color: var(--primary); }
+.toggle-active:checked::before { left: calc(100% - 1.15em); }
+.toggle-active:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.toggle-active:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Renommage inline : l'input occupe la cellule Nom. */
+.rename-input { width: 100%; font-size: .95em; }
+
+/* Boutons d'action compacts (Renommer / Supprimer / Réessayer). */
+.row-actions { display: inline-flex; gap: .4em; justify-content: flex-end; }
+.btn-row,
+.btn-retry { padding: .35em .7em; font-size: .82em; }
+/* Suppression : intention discrète au survol (charte, sans rouge agressif). */
+.btn-delete:hover { background: var(--indispo-bg); border-color: var(--indispo-tag-border); }
+
 /* Inactif : nom grisé + barré. */
 .participant-row.inactif .participant-name { color: var(--text-muted); text-decoration: line-through; }
 /* Optimiste non confirmé : retour visuel discret. */
 .participant-row.pending { opacity: .55; }
 /* Écriture échouée : fond d'alerte + bouton réessayer. */
 .participant-row.failed { background: var(--indispo-bg); }
-.btn-retry { padding: .35em .7em; font-size: .82em; }
 
 /* ── Messages d'erreur ─────────────────────────────────────────────────── */
 .form-error {
@@ -251,6 +283,10 @@ button:disabled:hover { filter: none; box-shadow: none; }
   .participant-table th,
   .participant-table td { padding: .5em .45em; }
   .participant-table th { font-size: .74em; }
+  /* Actions empilées : deux boutons courts restent tappables sans déborder. */
+  .row-actions { flex-direction: column; gap: .3em; }
+  .btn-row,
+  .btn-retry { padding: .3em .5em; font-size: .78em; }
 }
 
 /* ── Motion ────────────────────────────────────────────────────────────── */

@@ -1,26 +1,80 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useParticipants } from '@/lib/store/participants-store'
 import { parseNames } from '@/lib/store/parse-names'
 import { PassphrasePrompt } from '@/components/PassphrasePrompt'
 
-// Carte « Participants » interactive (Story 2.1). Tout en français (NFR4), charte CSS existante.
+// Carte « Participants » interactive (Story 2.1 + 2.2). Tout en français (NFR4), charte CSS existante.
 // UI pure : aucune écriture directe — tout passe par le store (AD-11).
-// Ajout MULTIPLE (`,`/`;`) + liste en tableau Nom / Actif / Actions.
-// ⚠️ Toggle actif, renommage, suppression = Story 2.2 (hors-scope ici).
+// Ajout MULTIPLE (`,`/`;`) + tableau Nom / Actif / Actions, colonnes Actif/Actions INTERACTIVES (2.2) :
+// toggle actif, renommage inline, suppression confirmée.
 export function ParticipantsCard() {
-  const { participants, addParticipants, retryParticipant, error, clearError } = useParticipants()
+  const {
+    participants,
+    addParticipants,
+    toggleActive,
+    renameParticipant,
+    deleteParticipant,
+    retryParticipant,
+    error,
+    clearError,
+  } = useParticipants()
   const [value, setValue] = useState('')
 
-  // Bouton actif uniquement si la saisie contient au moins un nom non vide après découpe (AC5).
+  // État d'édition inline LOCAL au composant (jamais dans le store) — Story 2.2.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
+  // Évite qu'un blur déclenché par Échap ne committe le renommage annulé.
+  const skipBlurRef = useRef(false)
+
+  // Bouton actif uniquement si la saisie contient au moins un nom non vide après découpe (AC5 de 2.1).
   const hasNames = parseNames(value).length > 0
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!hasNames) return
     addParticipants(value)
-    setValue('') // champ vidé après ajout (AC5).
+    setValue('') // champ vidé après ajout.
+  }
+
+  function startEdit(id: string, currentName: string) {
+    skipBlurRef.current = false
+    setEditingId(id)
+    setDraft(currentName)
+  }
+
+  function cancelEdit() {
+    skipBlurRef.current = true // le blur consécutif à l'unmount ne doit pas committer.
+    setEditingId(null)
+    setDraft('')
+  }
+
+  function commitEdit() {
+    if (skipBlurRef.current) {
+      skipBlurRef.current = false
+      return
+    }
+    if (editingId === null) return
+    renameParticipant(editingId, draft) // no-op si vide ou identique (géré par le store).
+    setEditingId(null)
+    setDraft('')
+  }
+
+  function onEditKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      commitEdit()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      cancelEdit()
+    }
+  }
+
+  function onDelete(id: string, name: string) {
+    if (window.confirm(`Supprimer « ${name} » ? Ses indisponibilités seront aussi supprimées.`)) {
+      deleteParticipant(id)
+    }
   }
 
   return (
@@ -78,15 +132,35 @@ export function ParticipantsCard() {
                   .filter(Boolean)
                   .join(' ')}
               >
-                <td className="participant-name">{p.name}</td>
-                {/* Indicateur lecture seule ; le toggle interactif arrive en Story 2.2. */}
+                <td className="participant-name">
+                  {editingId === p.id ? (
+                    <input
+                      className="text-input rename-input"
+                      type="text"
+                      value={draft}
+                      autoFocus
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={onEditKeyDown}
+                      onBlur={commitEdit}
+                      aria-label={`Renommer ${p.name}`}
+                    />
+                  ) : (
+                    p.name
+                  )}
+                </td>
                 <td className="participant-active">
-                  <span className={p.active ? 'badge-active' : 'badge-inactive'}>
-                    {p.active ? 'Actif' : 'Inactif'}
-                  </span>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    className="toggle-active"
+                    checked={p.active}
+                    disabled={p.pending}
+                    onChange={() => toggleActive(p.id)}
+                    aria-label={`${p.active ? 'Désactiver' : 'Activer'} ${p.name}`}
+                  />
                 </td>
                 <td className="participant-actions">
-                  {p.failed && (
+                  {p.failed ? (
                     <button
                       type="button"
                       className="btn-secondary btn-retry"
@@ -94,6 +168,27 @@ export function ParticipantsCard() {
                     >
                       Réessayer
                     </button>
+                  ) : (
+                    editingId !== p.id && (
+                      <span className="row-actions">
+                        <button
+                          type="button"
+                          className="btn-secondary btn-row"
+                          disabled={p.pending}
+                          onClick={() => startEdit(p.id, p.name)}
+                        >
+                          Renommer
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-row btn-delete"
+                          disabled={p.pending}
+                          onClick={() => onDelete(p.id, p.name)}
+                        >
+                          Supprimer
+                        </button>
+                      </span>
+                    )
                   )}
                 </td>
               </tr>
