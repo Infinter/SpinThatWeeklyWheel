@@ -48,6 +48,9 @@ tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
 
 # 2026-06-22 — Story 1.5 implémentée (Amelia/dev-story) : ready-for-dev → review.
+# 2026-06-22 — Story 2.1 contextée (Amelia/create-story) : backlog → ready-for-dev ; epic-2 backlog → in-progress (1ère story).
+# 2026-06-22 — Story 2.1 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
+# 2026-06-22 — Story 2.1 implémentée (Amelia/dev-story) : in-progress → review.
 
 development_status:
   epic-1: in-progress
@@ -57,8 +60,8 @@ development_status:
   1-4-proxy-ecriture-serveur-garde-par-passphrase: review
   1-5-tranche-verticale-participants-deploiement-vercel: review
   epic-1-retrospective: optional
-  epic-2: backlog
-  2-1-ajout-multiple-et-liste-des-participants: backlog
+  epic-2: in-progress
+  2-1-ajout-multiple-et-liste-des-participants: review
   2-2-activer-desactiver-renommer-supprimer-participant: backlog
   2-3-indisponibilites-individuelles-jour-isole-plage: backlog
   epic-2-retrospective: optional

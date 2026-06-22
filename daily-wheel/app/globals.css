@@ -172,29 +172,45 @@ button:disabled:hover { filter: none; box-shadow: none; }
   gap: .6em;
   margin-bottom: 1em;
 }
-.participant-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: .4em;
+/* Tableau Nom / Actif / Actions (Story 2.1). */
+.participant-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .95em;
 }
-.participant-item {
-  display: flex;
-  align-items: center;
-  gap: .6em;
+.participant-table th,
+.participant-table td {
   padding: .55em .8em;
-  background: var(--primary-light);
-  border: 1px solid var(--border);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.participant-table th {
+  font-size: .82em;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.participant-table tbody tr:last-child td { border-bottom: none; }
+.participant-name { font-size: .95em; }
+.participant-active { width: 1%; white-space: nowrap; }
+.participant-actions { width: 1%; white-space: nowrap; text-align: right; }
+/* Badge d'état actif (lecture seule en 2.1 ; le toggle interactif arrive en 2.2). */
+.badge-active,
+.badge-inactive {
+  display: inline-block;
+  padding: .15em .55em;
+  font-size: .8em;
   border-radius: var(--radius-sm);
 }
-.participant-name { flex: 1 1 auto; font-size: .95em; }
-/* Inactif (réutilisable Epic 2) : grisé + barré. */
-.participant-item.inactif { background: var(--card-bg); }
-.participant-item.inactif .participant-name { color: var(--text-muted); text-decoration: line-through; }
+.badge-active { color: var(--primary-dark); background: var(--primary-light); }
+.badge-inactive { color: var(--text-muted); background: var(--card-bg); border: 1px solid var(--border); }
+/* Inactif : nom grisé + barré. */
+.participant-row.inactif .participant-name { color: var(--text-muted); text-decoration: line-through; }
 /* Optimiste non confirmé : retour visuel discret. */
-.participant-item.pending { opacity: .55; }
-/* Écriture échouée : bordure d'alerte + bouton réessayer. */
-.participant-item.failed { border-color: var(--indispo-tag-border); background: var(--indispo-bg); }
+.participant-row.pending { opacity: .55; }
+/* Écriture échouée : fond d'alerte + bouton réessayer. */
+.participant-row.failed { background: var(--indispo-bg); }
 .btn-retry { padding: .35em .7em; font-size: .82em; }
 
 /* ── Messages d'erreur ─────────────────────────────────────────────────── */
@@ -231,6 +247,10 @@ button:disabled:hover { filter: none; box-shadow: none; }
   /* Le formulaire d'ajout s'empile pour rester lisible et tappable. */
   .participant-add { flex-direction: column; align-items: stretch; }
   .participant-add button { justify-content: center; }
+  /* Tableau : padding réduit pour rester lisible sans débordement horizontal. */
+  .participant-table th,
+  .participant-table td { padding: .5em .45em; }
+  .participant-table th { font-size: .74em; }
 }
 
 /* ── Motion ────────────────────────────────────────────────────────────── */

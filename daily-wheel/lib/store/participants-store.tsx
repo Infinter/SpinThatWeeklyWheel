@@ -18,6 +18,7 @@ import {
   type Participant,
 } from '@/lib/data/participants'
 import { reconcileParticipants, type ParticipantChangeEvent } from '@/lib/store/reconcile'
+import { parseNames } from '@/lib/store/parse-names'
 
 // Store client de la tranche verticale « participants » (Story 1.5).
 // UI → store → lib/data/ (AD-11) : aucun composant ne touche `supabase.from(...)` ni `fetch('/api/...')`.
@@ -81,7 +82,7 @@ function clearPassphrase(): void {
 // ── Contexte exposé ─────────────────────────────────────────────────────────
 type StoreValue = {
   participants: StoreParticipant[]
-  addParticipant: (name: string) => void
+  addParticipants: (raw: string) => void
   retryParticipant: (tempId: string) => void
   error: string | null
   clearError: () => void
@@ -163,15 +164,26 @@ export function ParticipantsStoreProvider({
     }
   }, [])
 
+  // Chemin INTERNE par nom : crée une ligne optimiste + déclenche l'écriture (réutilisé par addParticipants).
   const addParticipant = useCallback(
     (rawName: string) => {
       const name = rawName.trim()
-      if (!name) return // nom vide après trim → aucune écriture (AC3).
+      if (!name) return // nom vide après trim → aucune écriture.
       const tempId = `temp:${seqRef.current++}`
       dispatch({ type: 'ADD_OPTIMISTIC', tempId, name })
       void runWrite(tempId, name)
     },
     [runWrite],
+  )
+
+  // Point d'entrée PUBLIC (Story 2.1) : ajout multiple en une saisie (séparée par `,`/`;`).
+  // parseNames découpe/trim/élimine les vides ; chaque nom suit le chemin optimiste mono-nom.
+  // N noms sans passphrase → N écritures en file (pendingWritesRef) → UN seul prompt → replay groupé (AC2).
+  const addParticipants = useCallback(
+    (raw: string) => {
+      for (const name of parseNames(raw)) addParticipant(name)
+    },
+    [addParticipant],
   )
 
   const retryParticipant = useCallback(
@@ -238,7 +250,7 @@ export function ParticipantsStoreProvider({
 
   const value: StoreValue = {
     participants,
-    addParticipant,
+    addParticipants,
     retryParticipant,
     error,
     clearError,
