@@ -19,10 +19,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node 20.x
+      - name: Setup Node 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          # Node 22+ requis : @supabase/realtime-js exige un WebSocket natif global
+          # (absent en Node 20 → createClient() jette à l'import, cf. lib/supabase/client.ts).
+          node-version: 22.x
           cache: npm
           cache-dependency-path: daily-wheel/package-lock.json
 
