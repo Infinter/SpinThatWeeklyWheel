@@ -1,0 +1,72 @@
+# generated: 2026-06-22
+# last_updated: 2026-06-22
+# project: SpinThatWeeklyWheel
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+
+generated: 2026-06-22
+last_updated: 2026-06-22
+project: SpinThatWeeklyWheel
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  epic-1: in-progress
+  1-1-initialiser-application-nextjs-charte-existante: done
+  1-2-provisionner-supabase-schema-rls-realtime: backlog
+  1-3-connecter-app-supabase-lecture-cle-low-privilege: backlog
+  1-4-proxy-ecriture-serveur-garde-par-passphrase: backlog
+  1-5-tranche-verticale-participants-deploiement-vercel: backlog
+  epic-1-retrospective: optional
+  epic-2: backlog
+  2-1-ajout-multiple-et-liste-des-participants: backlog
+  2-2-activer-desactiver-renommer-supprimer-participant: backlog
+  2-3-indisponibilites-individuelles-jour-isole-plage: backlog
+  epic-2-retrospective: optional
+  epic-3: backlog
+  3-1-exclusions-de-groupe-recurrentes: backlog
+  3-2-jours-feries: backlog
+  3-3-jours-off-equipe: backlog
+  epic-3-retrospective: optional
+  epic-4: backlog
+  4-1-options-generation-weekends-date-debut: backlog
+  4-2-algorithme-edf-integrant-toutes-les-contraintes: backlog
+  4-3-affichage-planning-et-non-planifies: backlog
+  epic-4-retrospective: optional
