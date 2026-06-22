@@ -5,11 +5,10 @@ import { fetchParticipants } from '@/lib/data/participants'
 // Test d'INTÉGRATION LIVE (réseau + Supabase réel + clé secrète), gardé par variables d'env.
 // On appelle directement la Route Handler `POST(Request)` — une fonction Web standard,
 // pas besoin de serveur Next ni de port. Lancé par `npm run test:write`.
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const secret = process.env.SUPABASE_SECRET_KEY
 const passphrase = process.env.TEAM_PASSPHRASE
-const ready = Boolean(url && anon && secret && passphrase)
+// Skip propre sans secrets via le sentinel posé par tests/setup.ts (cf. read.integration).
+// La passphrase reste requise pour les écritures réelles (jamais remplie de placeholder).
+const ready = process.env.SUPABASE_TEST_LIVE === '1' && Boolean(passphrase)
 
 const ENDPOINT = 'http://localhost/api/participants'
 const TEST_NAME = '__test_1.4__'

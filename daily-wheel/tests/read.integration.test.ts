@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { fetchParticipants } from '@/lib/data/participants'
 
-// Test d'intégration LIVE (réseau + Supabase réel), gardé par variables d'environnement.
-// Se skippe proprement si les variables publiques sont absentes (CI sans credentials).
-// Lancé par `npm run test:read` — PAS enrôlé dans un `npm test` global (réservé Story 1.5, AD-13).
-const ready = Boolean(
-  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-)
+// Test d'intégration LIVE (réseau + Supabase réel), gardé par credentials réels.
+// Skip propre sans secrets via le sentinel `SUPABASE_TEST_LIVE` posé par tests/setup.ts
+// (les env sont remplies de placeholders d'import en CI → on ne peut PAS gater sur leur présence).
+// Enrôlé dans `npm test` global (Story 1.5, AD-13) et lançable seul via `npm run test:read`.
+const ready = process.env.SUPABASE_TEST_LIVE === '1'
 
 describe.skipIf(!ready)('Lecture low-privilege via lib/data (AD-7, AD-11)', () => {
   it('fetchParticipants() renvoie un tableau sans erreur', async () => {

@@ -7,10 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run --no-file-parallelism",
     "test:realtime": "vitest run tests/realtime.integration.test.ts",
     "test:read": "vitest run tests/read.integration.test.ts",
     "test:write": "vitest run tests/write.integration.test.ts",
-    "test:unit": "vitest run tests/write-error.unit.test.ts"
+    "test:unit": "vitest run tests/write-error.unit.test.ts tests/reconcile.unit.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

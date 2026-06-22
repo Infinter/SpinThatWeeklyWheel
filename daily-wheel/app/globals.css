@@ -122,11 +122,115 @@ button {
 button:hover       { filter: brightness(1.08); box-shadow: 0 4px 14px rgba(0, 120, 212, .35); }
 button:active      { transform: translateY(1px); box-shadow: none; }
 button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+/* État désactivé (dette différée 1.1) : feedback non-interactif clair. */
+button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+button:disabled:hover { filter: none; box-shadow: none; }
+
+/* Bouton secondaire (annuler / réessayer) : neutre, contour discret. */
+.btn-secondary {
+  background: var(--card-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+.btn-secondary:hover { filter: none; background: var(--primary-light); box-shadow: none; }
+
+/* Lien d'action inline (fermer un message). */
+.btn-link {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  color: var(--primary-dark);
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.btn-link:hover { filter: none; box-shadow: none; }
+
+/* ── Champs texte ──────────────────────────────────────────────────────── */
+.text-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: .6em .8em;
+  font-family: inherit;
+  font-size: .92em;
+  color: var(--text-color);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.text-input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; border-color: var(--primary); }
+
+/* ── Participants (Story 1.5) ──────────────────────────────────────────── */
+.participant-add {
+  display: flex;
+  gap: .6em;
+  margin-bottom: 1em;
+}
+.participant-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: .4em;
+}
+.participant-item {
+  display: flex;
+  align-items: center;
+  gap: .6em;
+  padding: .55em .8em;
+  background: var(--primary-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.participant-name { flex: 1 1 auto; font-size: .95em; }
+/* Inactif (réutilisable Epic 2) : grisé + barré. */
+.participant-item.inactif { background: var(--card-bg); }
+.participant-item.inactif .participant-name { color: var(--text-muted); text-decoration: line-through; }
+/* Optimiste non confirmé : retour visuel discret. */
+.participant-item.pending { opacity: .55; }
+/* Écriture échouée : bordure d'alerte + bouton réessayer. */
+.participant-item.failed { border-color: var(--indispo-tag-border); background: var(--indispo-bg); }
+.btn-retry { padding: .35em .7em; font-size: .82em; }
+
+/* ── Messages d'erreur ─────────────────────────────────────────────────── */
+.form-error {
+  margin-bottom: 1em;
+  padding: .6em .8em;
+  font-size: .88em;
+  color: var(--primary-dark);
+  background: var(--indispo-bg);
+  border: 1px solid var(--indispo-tag-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ── Prompt passphrase (AD-8) ──────────────────────────────────────────── */
+.passphrase-prompt {
+  margin-bottom: 1em;
+  padding: .8em;
+  background: var(--excl-bg);
+  border: 1px solid var(--excl-border);
+  border-radius: var(--radius-sm);
+}
+.passphrase-label {
+  display: block;
+  margin-bottom: .5em;
+  font-size: .85em;
+  color: var(--text-color);
+}
+.passphrase-row { display: flex; gap: .5em; flex-wrap: wrap; }
 
 /* ── Responsive (≤ 520px) ──────────────────────────────────────────────── */
 @media (max-width: 520px) {
   body { padding: 1.2em .8em 3em; }
   .app-header-text h1 { font-size: 1.25em; }
+  /* Le formulaire d'ajout s'empile pour rester lisible et tappable. */
+  .participant-add { flex-direction: column; align-items: stretch; }
+  .participant-add button { justify-content: center; }
 }
 
 /* ── Motion ────────────────────────────────────────────────────────────── */

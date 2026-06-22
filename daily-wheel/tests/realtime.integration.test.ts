@@ -11,7 +11,9 @@ import { createClient, type SupabaseClient, type RealtimeChannel } from '@supaba
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const secretKey = process.env.SUPABASE_SECRET_KEY
-const ready = Boolean(url && anonKey && secretKey)
+// Skip propre sans secrets via le sentinel posé par tests/setup.ts : en CI les env sont des
+// placeholders (truthy) → gater sur leur présence ferait tourner le test live à tort.
+const ready = process.env.SUPABASE_TEST_LIVE === '1'
 
 // Clients jetables créés directement depuis process.env (PAS via lib/supabase/ — périmètre Story 1.3).
 let writer: SupabaseClient | undefined
