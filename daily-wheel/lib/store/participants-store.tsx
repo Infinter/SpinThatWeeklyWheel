@@ -14,7 +14,6 @@ import { supabasePublic } from '@/lib/supabase/client'
 import {
   fetchParticipants,
   writeParticipant,
-  WriteError,
   type Participant,
 } from '@/lib/data/participants'
 import {
@@ -27,36 +26,25 @@ import {
   writeGroupExclusion,
   type GroupExclusion,
 } from '@/lib/data/group-exclusions'
+import { fetchHolidays, writeHoliday, type Holiday } from '@/lib/data/holidays'
 import { type ChangeEvent } from '@/lib/store/reconcile'
 import { participantsReducer, type StoreParticipant } from '@/lib/store/participants-reducer'
 import { unavailabilitiesReducer, type StoreUnavailability } from '@/lib/store/unavailabilities-reducer'
 import { groupExclusionsReducer, type StoreGroupExclusion } from '@/lib/store/group-exclusions-reducer'
+import { holidaysReducer, type StoreHoliday } from '@/lib/store/holidays-reducer'
 import { isValidRange, isDuplicateDay, type DayOrRange } from '@/lib/domain/availability'
 import { isValidEveryN, refDateMatchesDayOfWeek } from '@/lib/domain/team-availability'
 import { parseNames } from '@/lib/store/parse-names'
+import { useWriteQueue } from '@/lib/store/use-write-queue'
 
-// Store client de l'équipe (Story 1.5 → 2.3). UI → store → lib/data/ (AD-11) : aucun composant ne
+// Store client de l'équipe (Story 1.5 → 3.1). UI → store → lib/data/ (AD-11) : aucun composant ne
 // touche `supabase.from(...)` ni `fetch('/api/...')`. Le SEUL accès Supabase direct ici est
-// l'ABONNEMENT Realtime de lecture via `supabasePublic` (AD-6/AD-7), désormais sur DEUX tables.
+// l'ABONNEMENT Realtime de lecture via `supabasePublic` (AD-6/AD-7), sur TROIS tables.
 //
-// Story 2.3 : le provider porte une 2ᵉ slice (indisponibilités). La machinerie d'écriture
-// (`runWrite` + file passphrase) est rendue TABLE-AGNOSTIQUE — les specs portent leurs propres
-// thunks — pour préserver l'invariant AD-8 : N mutations (participants ET indispos confondus)
-// → UN SEUL prompt passphrase → rejeu groupé.
-
-// ── Passphrase (AD-8) : saisie dans l'UI, mémorisée en sessionStorage (onglet courant) ──────
-// JAMAIS une variable NEXT_PUBLIC_ ; JAMAIS loggée ; effacée sur 401.
-const PASSPHRASE_KEY = 'team-passphrase'
-function readPassphrase(): string | null {
-  if (typeof window === 'undefined') return null
-  return window.sessionStorage.getItem(PASSPHRASE_KEY)
-}
-function storePassphrase(value: string): void {
-  if (typeof window !== 'undefined') window.sessionStorage.setItem(PASSPHRASE_KEY, value)
-}
-function clearPassphrase(): void {
-  if (typeof window !== 'undefined') window.sessionStorage.removeItem(PASSPHRASE_KEY)
-}
+// Story 3.2 : la machinerie d'écriture (file passphrase + `runWrite` + taxonomie AD-17) est EXTRAITE
+// dans `useWriteQueue()` ([[store-extraction-plan]]). Le provider ne garde que : les slices (reducers),
+// les méthodes métier par table, les abonnements Realtime, et la valeur de contexte. La file reste
+// TABLE-AGNOSTIQUE → un seul prompt passphrase pour N mutations toutes tables confondues (AD-8).
 
 // Snapshots vers ligne serveur (sans pending/failed) pour les rollbacks RESTORE.
 function toServerRow(p: StoreParticipant): Participant {
@@ -81,18 +69,8 @@ function toServerGroupExclusion(g: StoreGroupExclusion): GroupExclusion {
     updated_at: g.updated_at,
   }
 }
-
-// Spécification d'une écriture serveur, TABLE-AGNOSTIQUE (Story 2.3) : porte ses propres thunks.
-// Mise en file (passphrase) ou conservée pour le retry telle quelle ; `submit`/`retry` la rejouent.
-type WriteSpec = {
-  write: (passphrase: string) => Promise<unknown> // l'appel data (writeParticipant / writeUnavailability)
-  onConfirm: (row: unknown) => void // succès : applique la ligne serveur (CONFIRM) ; delete → no-op
-  rollback: () => void // annule l'optimiste (insert→ROLLBACK ; update/delete→RESTORE snapshot)
-  onPending?: () => void // marque la ligne pending (SET_PENDING) ; absent pour un delete
-  onFailed?: () => void // marque la ligne failed (MARK_FAILED) ; absent pour un delete
-  onConflictRehydrate?: () => Promise<void> // 409 non-idempotent : re-hydrate depuis la source canonique
-  retryKey?: string | null // clé failedWritesRef (retry) ; null pour un delete (pas de retry)
-  deleteIdempotent?: boolean // delete : 409 « introuvable » = déjà supprimé ailleurs → succès idempotent (AD-16)
+function toServerHoliday(h: StoreHoliday): Holiday {
+  return { id: h.id, date: h.date, label: h.label, updated_at: h.updated_at }
 }
 
 // Forme « optionnelle » des inputs d'une indispo, telle que fournie par l'UI.
@@ -100,6 +78,9 @@ type UnavailabilityInput = { kind: 'day' | 'range'; date1: string; date2: string
 
 // Inputs d'une règle d'exclusion de groupe, tels que fournis par l'UI.
 type GroupExclusionInput = { day_of_week: number; every_n: number; ref_date: string }
+
+// Inputs d'un jour férié, tels que fournis par l'UI.
+type HolidayInput = { date: string; label: string }
 
 // ── Contexte exposé ─────────────────────────────────────────────────────────
 type StoreValue = {
@@ -117,6 +98,10 @@ type StoreValue = {
   addGroupExclusion: (input: GroupExclusionInput) => void
   removeGroupExclusion: (id: string) => void
   retryGroupExclusion: (id: string) => void
+  holidays: StoreHoliday[]
+  addHoliday: (input: HolidayInput) => void
+  removeHoliday: (id: string) => void
+  retryHoliday: (id: string) => void
   error: string | null
   clearError: () => void
   passphraseNeeded: boolean
@@ -130,11 +115,13 @@ export function ParticipantsStoreProvider({
   initial,
   initialUnavailabilities,
   initialGroupExclusions,
+  initialHolidays,
   children,
 }: {
   initial: Participant[]
   initialUnavailabilities: Unavailability[]
   initialGroupExclusions: GroupExclusion[]
+  initialHolidays: Holiday[]
   children: ReactNode
 }) {
   const [participants, dispatch] = useReducer(participantsReducer, initial as StoreParticipant[])
@@ -146,21 +133,21 @@ export function ParticipantsStoreProvider({
     groupExclusionsReducer,
     initialGroupExclusions as StoreGroupExclusion[],
   )
+  const [holidays, dispatchH] = useReducer(holidaysReducer, initialHolidays as StoreHoliday[])
   const [error, setError] = useState<string | null>(null)
-  const [passphraseNeeded, setPassphraseNeeded] = useState(false)
+
+  // File d'écriture partagée + passphrase (extraite en 3.2). TABLE-AGNOSTIQUE : un seul prompt pour N (AD-8).
+  const { runWrite, retry, passphraseNeeded, submitPassphrase, cancelPassphrase } = useWriteQueue({ setError })
 
   const seqRef = useRef(0) // ids temporaires d'insert participant (`temp:<n>`).
   const useqRef = useRef(0) // ids temporaires d'insert indispo (`utemp:<n>`).
   const gseqRef = useRef(0) // ids temporaires d'insert exclusion de groupe (`gtemp:<n>`).
-  const writeSeqRef = useRef(0) // clés uniques de file passphrase (`w:<n>`).
-  // Écritures en attente d'une passphrase (sans passphrase, ou re-prompt après 401) → rejouées après saisie (AC5).
-  const pendingWritesRef = useRef<Map<string, WriteSpec>>(new Map())
-  // Dernière écriture ÉCHOUÉE (transient) par retryKey → rejouée par retryParticipant/retryUnavailability (AC5).
-  const failedWritesRef = useRef<Map<string, WriteSpec>>(new Map())
+  const hseqRef = useRef(0) // ids temporaires d'insert jour férié (`htemp:<n>`).
   // Miroirs d'état pour lire un snapshot de ligne hors closure.
   const stateRef = useRef(participants)
   const stateRefU = useRef(unavailabilities)
   const stateRefG = useRef(groupExclusions)
+  const stateRefH = useRef(holidays)
   useEffect(() => {
     stateRef.current = participants
   }, [participants])
@@ -170,69 +157,9 @@ export function ParticipantsStoreProvider({
   useEffect(() => {
     stateRefG.current = groupExclusions
   }, [groupExclusions])
-
-  // Écriture serveur GÉNÉRIQUE et TABLE-AGNOSTIQUE portant la taxonomie d'erreurs AD-17.
-  // Le caller a DÉJÀ appliqué l'optimiste et fourni write/onConfirm/rollback (+ thunks optionnels).
-  const runWrite = useCallback(async (spec: WriteSpec) => {
-    const writeKey = `w:${writeSeqRef.current++}`
-    const passphrase = readPassphrase()
-    if (!passphrase) {
-      // Demande paresseuse : on garde l'optimiste, on met l'écriture en file, on ouvre UN seul prompt (AC5).
-      pendingWritesRef.current.set(writeKey, spec)
-      setPassphraseNeeded(true)
-      return
-    }
-    spec.onPending?.()
-    try {
-      const row = await spec.write(passphrase)
-      if (spec.retryKey != null) failedWritesRef.current.delete(spec.retryKey)
-      spec.onConfirm(row)
-    } catch (e) {
-      if (!(e instanceof WriteError)) {
-        if (spec.retryKey != null) {
-          spec.onFailed?.()
-          failedWritesRef.current.set(spec.retryKey, spec)
-        } else {
-          spec.rollback()
-        }
-        setError('Erreur inattendue lors de l’écriture. Réessayez.')
-        return
-      }
-      // Taxonomie d'erreurs d'écriture (AD-17).
-      switch (e.kind) {
-        case 'auth': // 401 : passphrase invalide → effacer, re-prompt, rejouer après saisie (AC5).
-          clearPassphrase()
-          pendingWritesRef.current.set(writeKey, spec)
-          spec.onPending?.()
-          setPassphraseNeeded(true)
-          break
-        case 'validation': // 400 : rollback de l'optimiste + message.
-          spec.rollback()
-          setError(e.message)
-          break
-        case 'conflict': // 409.
-          if (spec.deleteIdempotent) {
-            // delete : ligne déjà absente côté serveur → déjà supprimée ailleurs = succès idempotent (AD-16).
-            break
-          }
-          await spec.onConflictRehydrate?.()
-          setError('Conflit détecté — état resynchronisé avec le serveur.')
-          break
-        case 'transient': // 5xx.
-          if (spec.retryKey != null) {
-            // insert/update : on garde l'optimiste + bouton « Réessayer » (rejoue l'op d'origine, AC5).
-            spec.onFailed?.()
-            failedWritesRef.current.set(spec.retryKey, spec)
-            setError('Échec temporaire — vous pouvez réessayer.')
-          } else {
-            // delete : la ligne a déjà disparu → on la restaure et on invite à recommencer.
-            spec.rollback()
-            setError('Échec temporaire de la suppression — réessayez.')
-          }
-          break
-      }
-    }
-  }, [])
+  useEffect(() => {
+    stateRefH.current = holidays
+  }, [holidays])
 
   // ── Participants ────────────────────────────────────────────────────────────
   // Chemin INTERNE par nom : crée une ligne optimiste + déclenche l'insert (réutilisé par addParticipants).
@@ -346,15 +273,7 @@ export function ParticipantsStoreProvider({
   )
 
   // Rejoue la dernière écriture ÉCHOUÉE (transient) d'une ligne participant — l'op D'ORIGINE (AC5).
-  const retryParticipant = useCallback(
-    (id: string) => {
-      const spec = failedWritesRef.current.get(id)
-      if (!spec) return
-      failedWritesRef.current.delete(id)
-      void runWrite(spec)
-    },
-    [runWrite],
-  )
+  const retryParticipant = useCallback((id: string) => retry(id), [retry])
 
   // ── Indisponibilités (Story 2.3) ─────────────────────────────────────────────
   // Ajout (FR5) : validation cliente PURE d'abord (AC1) → si invalide, message FR + AUCUNE écriture.
@@ -434,15 +353,7 @@ export function ParticipantsStoreProvider({
     [runWrite],
   )
 
-  const retryUnavailability = useCallback(
-    (id: string) => {
-      const spec = failedWritesRef.current.get(id)
-      if (!spec) return
-      failedWritesRef.current.delete(id)
-      void runWrite(spec)
-    },
-    [runWrite],
-  )
+  const retryUnavailability = useCallback((id: string) => retry(id), [retry])
 
   // ── Exclusions de groupe (Story 3.1) ─────────────────────────────────────────
   // Ajout (FR6) : validation cliente PURE d'abord (AC1) → si invalide, message FR + AUCUNE écriture.
@@ -504,37 +415,71 @@ export function ParticipantsStoreProvider({
     [runWrite],
   )
 
-  const retryGroupExclusion = useCallback(
+  const retryGroupExclusion = useCallback((id: string) => retry(id), [retry])
+
+  // ── Jours fériés (Story 3.2) ──────────────────────────────────────────────────
+  // Ajout (FR7) : validation cliente d'abord (date + libellé + doublon) → si invalide, message FR +
+  // AUCUNE écriture. Sinon optimiste ADD_OPTIMISTIC + insert serveur. L'unicité de la date est aussi
+  // garantie par la contrainte DB (23505 → 409 → re-hydratation), la DB restant l'autorité.
+  const addHoliday = useCallback(
+    (input: HolidayInput) => {
+      const date = input.date
+      const label = input.label.trim()
+      if (!date) {
+        setError('Veuillez saisir une date.')
+        return
+      }
+      if (!label) {
+        setError('Veuillez saisir un libellé.')
+        return
+      }
+      if (stateRefH.current.some((h) => h.date === date)) {
+        setError('Ce jour férié est déjà ajouté.')
+        return
+      }
+      const tempId = `htemp:${hseqRef.current++}`
+      const row: Holiday = { id: tempId, date, label, updated_at: '' }
+      dispatchH({ type: 'ADD_OPTIMISTIC', tempId, row })
+      void runWrite({
+        write: (pp) => writeHoliday('insert', { data: { date, label } }, pp),
+        onPending: () => dispatchH({ type: 'SET_PENDING', id: tempId }),
+        onConfirm: (r) => dispatchH({ type: 'CONFIRM', tempId, row: r as Holiday }),
+        onFailed: () => dispatchH({ type: 'MARK_FAILED', id: tempId }),
+        rollback: () => dispatchH({ type: 'ROLLBACK', tempId }),
+        onConflictRehydrate: async () => {
+          try {
+            dispatchH({ type: 'HYDRATE', rows: await fetchHolidays() })
+          } catch {
+            /* Realtime prendra le relais. */
+          }
+        },
+        retryKey: tempId,
+      })
+    },
+    [runWrite],
+  )
+
+  // Suppression unitaire (✕) : snapshot AVANT REMOVE → restauration si échec (delete idempotent).
+  const removeHoliday = useCallback(
     (id: string) => {
-      const spec = failedWritesRef.current.get(id)
-      if (!spec) return
-      failedWritesRef.current.delete(id)
-      void runWrite(spec)
+      const snapshot = stateRefH.current.find((h) => h.id === id)
+      if (!snapshot) return
+      const restore = toServerHoliday(snapshot)
+      dispatchH({ type: 'REMOVE', id })
+      void runWrite({
+        write: (pp) => writeHoliday('delete', { id }, pp),
+        onConfirm: () => {
+          /* déjà retiré ; l'écho Realtime DELETE est un no-op (AD-15). */
+        },
+        rollback: () => dispatchH({ type: 'RESTORE', row: restore }),
+        deleteIdempotent: true,
+        retryKey: null,
+      })
     },
     [runWrite],
   )
 
-  const submitPassphrase = useCallback(
-    (value: string) => {
-      const v = value.trim()
-      if (!v) return
-      storePassphrase(v)
-      setPassphraseNeeded(false)
-      // Rejoue TOUTES les écritures en file (participants ET indispos) — un seul prompt pour N (AC5).
-      const queued = Array.from(pendingWritesRef.current.values())
-      pendingWritesRef.current.clear()
-      for (const spec of queued) void runWrite(spec)
-    },
-    [runWrite],
-  )
-
-  const cancelPassphrase = useCallback(() => {
-    setPassphraseNeeded(false)
-    // Annulation : rollback de chaque optimiste en attente (insert→remove, update/delete→restore).
-    const queued = Array.from(pendingWritesRef.current.values())
-    pendingWritesRef.current.clear()
-    for (const spec of queued) spec.rollback()
-  }, [])
+  const retryHoliday = useCallback((id: string) => retry(id), [retry])
 
   const clearError = useCallback(() => setError(null), [])
 
@@ -621,6 +566,33 @@ export function ParticipantsStoreProvider({
     }
   }, [])
 
+  // ── 4ᵉ abonnement Realtime : jours fériés (Story 3.2, AD-6) ──────────────────
+  useEffect(() => {
+    const channel = supabasePublic
+      .channel('holidays-rt')
+      .on<Holiday>(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'holidays' },
+        (payload) => {
+          const event = mapChange<Holiday>(payload)
+          if (event) dispatchH({ type: 'REALTIME', event })
+        },
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          fetchHolidays()
+            .then((rows) => dispatchH({ type: 'HYDRATE', rows }))
+            .catch(() => {
+              /* refetch impossible : un prochain SUBSCRIBED réessaiera. */
+            })
+        }
+      })
+
+    return () => {
+      void supabasePublic.removeChannel(channel)
+    }
+  }, [])
+
   const value: StoreValue = {
     participants,
     addParticipants,
@@ -636,6 +608,10 @@ export function ParticipantsStoreProvider({
     addGroupExclusion,
     removeGroupExclusion,
     retryGroupExclusion,
+    holidays,
+    addHoliday,
+    removeHoliday,
+    retryHoliday,
     error,
     clearError,
     passphraseNeeded,

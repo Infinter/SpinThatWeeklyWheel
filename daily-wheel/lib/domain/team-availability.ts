@@ -72,11 +72,18 @@ export function isGroupExcluded(rules: GroupExclusionRule[], date: string): bool
   })
 }
 
-// UNIQUE prédicat « jour neutralisé » de l'équipe (AD-3). Story 3.1 : seule la branche
-// « exclusions de groupe » est câblée. 3.2/3.3/4.1 ajouteront ici, en `||`, les branches
-// jours fériés / jours off d'équipe / week-ends — sans changer la signature.
+// Vrai ssi `date` (YMD) figure dans l'ensemble des jours fériés de l'équipe (Story 3.2).
+// Comparaison de CHAÎNES YMD (dates déjà normalisées local) → aucun recours à `Date`. Liste vide → false.
+// La règle métier (unicité de la date) est portée par la saisie + la contrainte DB `holidays.date unique`.
+export function isHoliday(holidays: { date: string }[], date: string): boolean {
+  return holidays.some((h) => h.date === date)
+}
+
+// UNIQUE prédicat « jour neutralisé » de l'équipe (AD-3). Story 3.1 : branche « exclusions de groupe ».
+// Story 3.2 : branche « jours fériés » AJOUTÉE en `||`. 3.3 (jours off) et 4.1 (week-ends) ajouteront
+// les leurs ici, sans changer la signature.
 export function isTeamNonSessionDay(date: string, ctx: TeamConstraints): boolean {
-  return isGroupExcluded(ctx.groupExclusions ?? [], date)
+  return isGroupExcluded(ctx.groupExclusions ?? [], date) || isHoliday(ctx.holidays ?? [], date)
 }
 
 // Validateurs d'entrée purs (validation primaire AC1, co-localisés dans ce module pur testé en CI).

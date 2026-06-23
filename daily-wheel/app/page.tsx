@@ -1,9 +1,11 @@
 import { fetchParticipants, type Participant } from '@/lib/data/participants'
 import { fetchUnavailabilities, type Unavailability } from '@/lib/data/unavailabilities'
 import { fetchGroupExclusions, type GroupExclusion } from '@/lib/data/group-exclusions'
+import { fetchHolidays, type Holiday } from '@/lib/data/holidays'
 import { ParticipantsStoreProvider } from '@/lib/store/participants-store'
 import { ParticipantsCard } from '@/components/ParticipantsCard'
 import { GroupExclusionsPanel } from '@/components/GroupExclusionsPanel'
+import { HolidaysPanel } from '@/components/HolidaysPanel'
 
 // Rendu DYNAMIQUE (AC8) : l'état est live et partagé (FR13), pas de prérendu statique.
 // Les fetchs tournent aussi côté serveur (NEXT_PUBLIC_* seulement).
@@ -11,12 +13,13 @@ export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   // SSR de l'état initial → passé au provider client (pas de flash de chargement).
-  // Les trois fetchs en parallèle, INDÉPENDANTS : l'échec de l'un retombe sur [] sans perdre les autres
+  // Les quatre fetchs en parallèle, INDÉPENDANTS : l'échec de l'un retombe sur [] sans perdre les autres
   // (Realtime + re-hydratation AD-6 prennent le relais).
-  const [initial, initialUnavailabilities, initialGroupExclusions] = await Promise.all([
+  const [initial, initialUnavailabilities, initialGroupExclusions, initialHolidays] = await Promise.all([
     fetchParticipants().catch((): Participant[] => []),
     fetchUnavailabilities().catch((): Unavailability[] => []),
     fetchGroupExclusions().catch((): GroupExclusion[] => []),
+    fetchHolidays().catch((): Holiday[] => []),
   ])
 
   return (
@@ -39,12 +42,14 @@ export default async function Home() {
           initial={initial}
           initialUnavailabilities={initialUnavailabilities}
           initialGroupExclusions={initialGroupExclusions}
+          initialHolidays={initialHolidays}
         >
           <ParticipantsCard />
 
           <section className="card" aria-labelledby="card-options">
             <h2 id="card-options" className="card-title">Options</h2>
             <GroupExclusionsPanel />
+            <HolidaysPanel />
           </section>
         </ParticipantsStoreProvider>
 
