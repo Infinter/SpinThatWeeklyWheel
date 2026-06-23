@@ -43,7 +43,7 @@
 generated: 2026-06-22
 last_updated: 2026-06-23
 project: SpinThatWeeklyWheel
-# (last_updated reflète la mise à jour Story 5.3 → review)
+# (last_updated reflète la mise à jour Story 5.4 → review)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
@@ -86,6 +86,9 @@ story_location: _bmad-output/implementation-artifacts
 # 2026-06-23 — Story 5.3 contextée (Amelia/create-story) : backlog → ready-for-dev (epic-5 déjà in-progress ; timeline = projection PURE lib/ui/, domaine intact/golden vert, couleurs partagées roue 5.4, périmètre 4.3 protégé, défer 5.4→5.9).
 # 2026-06-23 — Story 5.3 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
 # 2026-06-23 — Story 5.3 implémentée (Amelia/dev-story) : in-progress → review (timeline = projection pure lib/ui/, domaine intact/golden 2/2, 18 tests, tsc 0/eslint 0/280 tests/build OK ; contrôle pixel navigateur recommandé en passe humaine).
+# 2026-06-23 — Story 5.4 contextée (Amelia/create-story) : backlog → ready-for-dev (epic-5 déjà in-progress ; roue = composant pur-piloté SpinWheel + cœur géométrie/easing extrait pur lib/ui/wheel.ts, buildTimeline étendu d'un état `pending` additif/rétro-compatible ; révéler≠re-tirer UX-DR9 ; revealedCount local à ScheduleResult ; contrat couleur 5.3 réutilisé ; domaine/golden intacts ; modes/persistance/exports/microcopie différés 5.5→5.9).
+# 2026-06-23 — Story 5.4 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
+# 2026-06-23 — Story 5.4 implémentée (Amelia/dev-story) : in-progress → review (roue canvas SpinWheel + cœur pur lib/ui/wheel.ts « révèle≠tire », buildTimeline étendu pending/revealedCount rétro-compatible, ScheduleResult orchestrateur reset+auto-spin via pattern de rendu, placeholder « à tirer » + pop/halo, double garde reduced-motion ; contrat couleur 5.3 réutilisé, domaine/golden intacts 2/2 ; +20 tests, tsc 0/eslint 0/300 tests/build OK ; contrôle navigateur recommandé en passe humaine).
 
 development_status:
   epic-1: in-progress
@@ -114,7 +117,7 @@ development_status:
   5-1-parcours-guide-stepper-protection-annoncee: review
   5-2-regle-rotation-horizon-etendu: review
   5-3-timeline-visuelle-grille-multi-lignes-sans-scrollbar: review
-  5-4-roue-animee-theatre-revelation-resultat-edf: backlog
+  5-4-roue-animee-theatre-revelation-resultat-edf: review
   5-5-deux-modes-rotation-complete-jour-le-jour: backlog
   5-6-persistance-rotation-mode-jour-le-jour: backlog
   5-7-exports-slack-csv-avec-apercu: backlog

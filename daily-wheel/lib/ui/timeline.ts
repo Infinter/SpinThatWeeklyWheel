@@ -23,9 +23,11 @@ import {
 } from '@/lib/domain/team-availability'
 import type { ScheduleRow } from '@/lib/domain/schedule'
 
-// Une cellule de la timeline. Trois formes disjointes selon le type de jour.
+// Une cellule de la timeline. Quatre formes disjointes selon le type de jour.
+// `pending` (Story 5.4) = jour ouvré PAS ENCORE révélé par la roue — son animateur reste un secret.
 export type TimelineCell =
   | { date: string; kind: 'working'; participantId: string; name: string; colorIndex: number }
+  | { date: string; kind: 'pending' }
   | { date: string; kind: 'weekend'; label: string; skipped: true }
   | { date: string; kind: 'blocked'; label: string; skipped: true }
 
@@ -38,12 +40,18 @@ export type BuildTimelineArgs = {
   colorIndexById: ReadonlyMap<string, number>
   /** Libellé saisi d'un jour férié / off (le store le porte ; le domaine ne reçoit que `{date}`). */
   blockedLabelFor?: (date: string) => string | undefined
+  /**
+   * Story 5.4 — nb de jours ouvrés DÉJÀ révélés par la roue (ordre chronologique). Les jours ouvrés
+   * d'index de travail `>= revealedCount` sortent en cellules `pending` (« à tirer »). ABSENT ⇒ tout
+   * est révélé (comportement 5.3 inchangé : la timeline statique affiche le planning complet).
+   */
+  revealedCount?: number
 }
 
 // Construit la bande de cellules du PREMIER au DERNIER jour planifié (inclus), sans trou. Planning vide
 // → `[]` (le composant retombe alors sur les états vides hérités de 4.3).
 export function buildTimeline(args: BuildTimelineArgs): TimelineCell[] {
-  const { planning, constraints, colorIndexById, blockedLabelFor } = args
+  const { planning, constraints, colorIndexById, blockedLabelFor, revealedCount } = args
   if (planning.length === 0) return []
 
   // Index des jours ouvrés par date (la présence ici PRIME sur toute classification — défensif vs
@@ -54,17 +62,27 @@ export function buildTimeline(args: BuildTimelineArgs): TimelineCell[] {
   const last = planning[planning.length - 1].date
 
   const cells: TimelineCell[] = []
+  // Compteur d'index de travail : n'avance QUE sur les jours ouvrés (les week-ends/bloqués ne sont pas
+  // « tirés » par la roue). Détermine si un jour ouvré est déjà révélé (`< revealedCount`) ou « pending ».
+  let workIndex = 0
   let d = first
   while (d <= last) {
     const row = workingByDate.get(d)
     if (row) {
-      cells.push({
-        date: d,
-        kind: 'working',
-        participantId: row.participantId,
-        name: row.name,
-        colorIndex: colorIndexById.get(row.participantId) ?? 0,
-      })
+      const revealed = revealedCount === undefined || workIndex < revealedCount
+      workIndex++
+      if (revealed) {
+        cells.push({
+          date: d,
+          kind: 'working',
+          participantId: row.participantId,
+          name: row.name,
+          colorIndex: colorIndexById.get(row.participantId) ?? 0,
+        })
+      } else {
+        // Jour ouvré pas encore révélé par la roue : placeholder « à tirer », animateur caché (AC-10f).
+        cells.push({ date: d, kind: 'pending' })
+      }
     } else {
       // Jour non planifié dans l'intervalle ⇒ nécessairement neutralisé (invariant no-hole). On en
       // déduit le LIBELLÉ par précédence : un libellé explicite (férié/off/exclusion) prime sur le

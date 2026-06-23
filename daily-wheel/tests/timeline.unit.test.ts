@@ -135,6 +135,67 @@ describe('buildTimeline (Story 5.3)', () => {
   })
 })
 
+describe('buildTimeline — révélation progressive (Story 5.4, AC-10f)', () => {
+  // 2026-06-22=lun, 23=mar, 24=mer ouvrés ; week-ends/bloqués toujours rendus quel que soit revealedCount.
+  const threeWorking = [
+    row('2026-06-22', 'p1', 'Alice'),
+    row('2026-06-23', 'p2', 'Bob'),
+    row('2026-06-24', 'p3', 'Carol'),
+  ]
+
+  it('revealedCount absent ⇒ TOUT révélé (rétro-compat 5.3 : working partout)', () => {
+    const cells = buildTimeline({ planning: threeWorking, constraints: {}, colorIndexById: ids('p1', 'p2', 'p3') })
+    expect(cells.every((c) => c.kind === 'working')).toBe(true)
+  })
+
+  it('revealedCount = 0 ⇒ toutes les cellules ouvrées sont « pending » (sans exposer le nom)', () => {
+    const cells = buildTimeline({
+      planning: threeWorking,
+      constraints: {},
+      colorIndexById: ids('p1', 'p2', 'p3'),
+      revealedCount: 0,
+    })
+    expect(cells.map((c) => c.kind)).toEqual(['pending', 'pending', 'pending'])
+    // Le pending ne divulgue aucune info animateur.
+    expect(cells[0]).toEqual({ date: '2026-06-22', kind: 'pending' })
+  })
+
+  it('revealedCount = 1 ⇒ 1re ouvrée working, reste pending', () => {
+    const cells = buildTimeline({
+      planning: threeWorking,
+      constraints: {},
+      colorIndexById: ids('p1', 'p2', 'p3'),
+      revealedCount: 1,
+    })
+    expect(cells.map((c) => c.kind)).toEqual(['working', 'pending', 'pending'])
+    expect(cells[0]).toMatchObject({ kind: 'working', participantId: 'p1', colorIndex: 0 })
+  })
+
+  it('revealedCount = nb ouvrés ⇒ toutes working', () => {
+    const cells = buildTimeline({
+      planning: threeWorking,
+      constraints: {},
+      colorIndexById: ids('p1', 'p2', 'p3'),
+      revealedCount: 3,
+    })
+    expect(cells.map((c) => c.kind)).toEqual(['working', 'working', 'working'])
+  })
+
+  it('l\'index de révélation ne compte QUE les jours ouvrés (week-ends/bloqués toujours rendus)', () => {
+    // p1 (ven 26), WE sam 27 + dim 28, p2 (lun 29). revealedCount=1 → seul le ven 26 est working.
+    const cells = buildTimeline({
+      planning: [row('2026-06-26', 'p1', 'Alice'), row('2026-06-29', 'p2', 'Bob')],
+      constraints: { skipWeekends: true },
+      colorIndexById: ids('p1', 'p2'),
+      revealedCount: 1,
+    })
+    expect(cells.find((c) => c.date === '2026-06-26')).toMatchObject({ kind: 'working', participantId: 'p1' })
+    expect(cells.find((c) => c.date === '2026-06-27')).toMatchObject({ kind: 'weekend' })
+    expect(cells.find((c) => c.date === '2026-06-28')).toMatchObject({ kind: 'weekend' })
+    expect(cells.find((c) => c.date === '2026-06-29')).toEqual({ date: '2026-06-29', kind: 'pending' })
+  })
+})
+
 describe('participant-colors (Story 5.3, AC-6)', () => {
   it('(e) palette wheel-segments figée (8 couleurs)', () => {
     expect(WHEEL_SEGMENT_COLORS).toHaveLength(8)

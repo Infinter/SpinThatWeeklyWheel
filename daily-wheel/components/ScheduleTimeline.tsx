@@ -10,8 +10,17 @@ import { weekdayShortFr, dayOfMonth, monthShortFr } from '@/lib/format/date-fr'
 // remplace le tableau de 4.3 par une grille de cellules jour qui s'enroule sans scrollbar. AUCUNE
 // logique de contrainte ici (AD-1/AD-3) — la classification week-end/bloqué est déléguée à la feuille
 // pure `buildTimeline`, qui réutilise les prédicats du domaine. La couleur d'un animateur dérive de son
-// index dans les ACTIFS (ordre du store) : la roue (5.4) réutilisera le même contrat (AC-6).
-export function ScheduleTimeline() {
+// index dans les ACTIFS (ordre du store) : la roue (5.4) réutilise le même contrat (AC-6).
+//
+// Story 5.4 : pilotée par la roue via `revealedCount`. Les jours ouvrés pas encore tirés sortent en
+// cellules « à tirer » (pending, animateur caché) ; la cellule fraîchement révélée (`justRevealedDate`)
+// reçoit la classe `justpicked` (halo + pop). Props ABSENTES ⇒ comportement 5.3 (tout révélé, statique).
+export type ScheduleTimelineProps = {
+  revealedCount?: number
+  justRevealedDate?: string | null
+}
+
+export function ScheduleTimeline({ revealedCount, justRevealedDate }: ScheduleTimelineProps = {}) {
   const { schedule, participants, groupExclusions, holidays, teamOffDays, settings } = useParticipants()
 
   // Planning vide / non généré → la carte Résultat (4.3) affiche ses états vides hérités.
@@ -47,36 +56,43 @@ export function ScheduleTimeline() {
     constraints,
     colorIndexById,
     blockedLabelFor,
+    revealedCount,
   })
 
   return (
     <div className="timeline" role="list" aria-label="Planning de la rotation">
-      {cells.map((cell) => (
-        <div
-          key={cell.date}
-          role="listitem"
-          className={`day${cell.kind === 'weekend' ? ' weekend' : ''}${cell.kind === 'blocked' ? ' blocked' : ''}`}
-        >
-          <div className="dow">{weekdayShortFr(cell.date)}</div>
-          <div className="dnum">{dayOfMonth(cell.date)}</div>
-          <div className="mon">{monthShortFr(cell.date)}</div>
-          {cell.kind === 'working' ? (
-            <>
-              {/* Pastille décorative (aria-hidden) : l'animateur est aussi nommé en clair → la couleur
-                  n'est jamais le seul signal (UX-DR13). */}
-              <div className="av-lg" aria-hidden="true" style={{ background: colorForIndex(cell.colorIndex) }}>
-                {initialOf(cell.name)}
-              </div>
-              <div className="who">{cell.name}</div>
-            </>
-          ) : (
-            <>
-              <div className="badge">{cell.label}</div>
-              <div className="skipnote">sauté</div>
-            </>
-          )}
-        </div>
-      ))}
+      {cells.map((cell) => {
+        const justPicked = cell.kind === 'working' && cell.date === justRevealedDate
+        return (
+          <div
+            key={cell.date}
+            role="listitem"
+            className={`day${cell.kind === 'weekend' ? ' weekend' : ''}${cell.kind === 'blocked' ? ' blocked' : ''}${justPicked ? ' justpicked' : ''}`}
+          >
+            <div className="dow">{weekdayShortFr(cell.date)}</div>
+            <div className="dnum">{dayOfMonth(cell.date)}</div>
+            <div className="mon">{monthShortFr(cell.date)}</div>
+            {cell.kind === 'working' ? (
+              <>
+                {/* Pastille décorative (aria-hidden) : l'animateur est aussi nommé en clair → la couleur
+                    n'est jamais le seul signal (UX-DR13). */}
+                <div className="av-lg" aria-hidden="true" style={{ background: colorForIndex(cell.colorIndex) }}>
+                  {initialOf(cell.name)}
+                </div>
+                <div className="who">{cell.name}</div>
+              </>
+            ) : cell.kind === 'pending' ? (
+              /* Jour ouvré pas encore tiré : placeholder « à tirer ». Aucun nom ni couleur (suspense). */
+              <div className="slot">à tirer</div>
+            ) : (
+              <>
+                <div className="badge">{cell.label}</div>
+                <div className="skipnote">sauté</div>
+              </>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
