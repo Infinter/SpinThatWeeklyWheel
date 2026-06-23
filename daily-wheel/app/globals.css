@@ -23,6 +23,9 @@
   --excl-border:      #bfdbfe;
   --excl-tag-bg:      #dbeafe;
   --excl-tag-border:  #93c5fd;
+  /* Tokens « jour bloqué » de la timeline (Story 5.3) — fond + bordure des cellules sautées (férié/off). */
+  --gold-soft:        #fef3c7;
+  --gold-border:      #fcd34d;
 }
 
 /* ── Reset / Base ──────────────────────────────────────────────────────── */
@@ -850,6 +853,59 @@ button:disabled:hover { filter: none; box-shadow: none; }
   font-size: .82em;
   color: var(--text-muted);
 }
+
+/* ── Timeline visuelle (Story 5.3 — grille multi-lignes, sans scrollbar, UX-DR10/UX-DR13) ── */
+/* `auto-fit` + `minmax` : la grille s'enroule sur plusieurs lignes quand l'espace manque ; AUCUNE
+   scrollbar horizontale, ni desktop ni mobile (le reflux ≤520px est géré par l'algorithme lui-même). */
+.timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+  padding: 2px 0 4px;
+}
+.day {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 8px 12px;
+  min-height: 132px;
+  background: var(--card-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+}
+.day .dow { font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.day .dnum { font-size: 1.15rem; font-weight: 800; color: var(--text-color); line-height: 1; }
+.day .mon { font-size: .62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.day .av-lg {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  display: grid;
+  place-items: center;
+  margin: 4px auto 2px;
+}
+.day .who { font-size: .8rem; font-weight: 600; color: var(--text-color); }
+/* Badge texte (« WE » / « Férié » / … ) + « sauté » : la couleur n'est JAMAIS le seul signal (UX-DR13). */
+.day .badge {
+  font-size: .62rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid currentColor;
+  color: var(--text-muted);
+  align-self: center;
+  margin-top: auto;
+}
+.day .skipnote { font-size: .6rem; color: var(--text-muted); margin-top: 2px; }
+/* Week-end : filigrane hachuré (gris non tokenisés, cosmétique locale du motif). */
+.day.weekend { background: repeating-linear-gradient(45deg, #f8fafc, #f8fafc 6px, #f1f5f9 6px, #f1f5f9 12px); }
+/* Jour bloqué (férié / off / exclusion) : fond ambre doux + bordure or. */
+.day.blocked { background: var(--gold-soft); border-color: var(--gold-border); }
 
 /* ── Responsive (≤ 520px) ──────────────────────────────────────────────── */
 @media (max-width: 520px) {

@@ -18,6 +18,25 @@ export function formatDateFr(ymd: string): string {
   })
 }
 
+// Formatteurs COURTS pour la timeline (Story 5.3, AC-2). Mêmes conventions : parsing LOCAL via
+// `parseYMD` (jamais UTC). Le point final que `toLocaleDateString` ajoute aux abréviations FR
+// (« lun. », « juin », « janv. ») est retiré pour des cellules compactes (« lun », « juin »).
+
+// Jour de semaine abrégé FR (« lun », « mar », …).
+export function weekdayShortFr(ymd: string): string {
+  return parseYMD(ymd).toLocaleDateString('fr-FR', { weekday: 'short' }).replace(/\.$/, '')
+}
+
+// Numéro du jour dans le mois (« 1 », « 23 »).
+export function dayOfMonth(ymd: string): string {
+  return String(parseYMD(ymd).getDate())
+}
+
+// Mois abrégé FR (« juin », « janv », …).
+export function monthShortFr(ymd: string): string {
+  return parseYMD(ymd).toLocaleDateString('fr-FR', { month: 'short' }).replace(/\.$/, '')
+}
+
 // Date du jour en `YYYY-MM-DD` LOCAL (défaut d'affichage de la date de début — Story 4.1, FR10).
 // CRITIQUE : formatage local via getFullYear/getMonth/getDate, JAMAIS toISOString() (UTC → décalage).
 export function todayYMD(): string {

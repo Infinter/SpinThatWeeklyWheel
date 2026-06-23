@@ -1,19 +1,15 @@
 'use client'
 
 import { useParticipants } from '@/lib/store/participants-store'
-import { formatDateFr } from '@/lib/format/date-fr'
+import { ScheduleTimeline } from '@/components/ScheduleTimeline'
 
-// Carte Résultat (Story 4.3, FR12). UI pure : tout passe par le store (AD-11) — le bouton déclenche
-// `generate()` (calcul client éphémère, Story 4.2), le rendu lit `schedule`. C'est l'ACTION PRINCIPALE
-// de l'app (UX-DR1). 4.3 met en FORME le résultat brut produit par 4.2 : compteur en en-tête,
-// dates longues FR, avertissement non-planifiés (raison GÉNÉRIQUE — le domaine ne fournit que {id,name},
-// type ScheduleResult GELÉ/asserté par le golden), message explicite « aucun planifiable », responsive ≤520px.
-// AUCUNE logique de contraintes ici (AD-1/AD-3) : on n'affiche que ce que le domaine a calculé.
-
-// Capitalise l'initiale de la date longue FR (« mardi … » → « Mardi … ») — cosmétique, sans toucher date-fr.ts.
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
+// Carte Résultat (Story 4.3, FR12 ; timeline Story 5.3, UX-DR10). UI pure : tout passe par le store
+// (AD-11) — le bouton déclenche `generate()` (calcul client éphémère, Story 4.2), le rendu lit `schedule`.
+// C'est l'ACTION PRINCIPALE de l'app (UX-DR1). 4.3 met en FORME le résultat (compteur en en-tête,
+// avertissement non-planifiés en raison GÉNÉRIQUE — le domaine ne fournit que {id,name}, type
+// ScheduleResult GELÉ/asserté par le golden — message « aucun planifiable », responsive ≤520px). 5.3
+// remplace le tableau par la <ScheduleTimeline /> (grille de jours visuelle). AUCUNE logique de
+// contraintes ici (AD-1/AD-3) : on n'affiche que ce que le domaine a calculé.
 
 export function ScheduleResult() {
   const { schedule, generate, participants } = useParticipants()
@@ -62,22 +58,7 @@ export function ScheduleResult() {
             </span>
           </div>
 
-          <table className="participant-table schedule-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Animateur</th>
-              </tr>
-            </thead>
-            <tbody>
-              {schedule.planning.map((row) => (
-                <tr key={row.date}>
-                  <td>{capitalize(formatDateFr(row.date))}</td>
-                  <td>{row.name}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ScheduleTimeline />
 
           {unscheduledWarning}
         </div>
