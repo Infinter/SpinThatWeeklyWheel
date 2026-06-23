@@ -72,6 +72,9 @@ story_location: _bmad-output/implementation-artifacts
 # 2026-06-23 — Story 4.2 contextée (Amelia/create-story) : backlog → ready-for-dev (epic-4 déjà in-progress).
 # 2026-06-23 — Story 4.2 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
 # 2026-06-23 — Story 4.2 implémentée (Amelia/dev-story) : in-progress → review.
+# 2026-06-23 — Story 4.3 contextée (Amelia/create-story) : backlog → ready-for-dev (epic-4 déjà in-progress ; dernière story d'Epic 4).
+# 2026-06-23 — Story 4.3 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
+# 2026-06-23 — Story 4.3 implémentée (Amelia/dev-story) : in-progress → review. Clôt l'implémentation d'Epic 4.
 
 development_status:
   epic-1: in-progress
@@ -94,5 +97,5 @@ development_status:
   epic-4: in-progress
   4-1-options-generation-weekends-date-debut: review
   4-2-algorithme-edf-integrant-toutes-les-contraintes: review
-  4-3-affichage-planning-et-non-planifies: backlog
+  4-3-affichage-planning-et-non-planifies: review
   epic-4-retrospective: optional

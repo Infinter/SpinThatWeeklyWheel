@@ -711,7 +711,7 @@ button:disabled:hover { filter: none; box-shadow: none; }
 .team-off-tag button:disabled { opacity: .5; }
 .team-off-empty { font-size: .78em; color: var(--text-muted); font-style: italic; }
 
-/* ── Résultat de génération (Story 4.2 — rendu MINIMAL ; présentation soignée = Story 4.3) ── */
+/* ── Résultat de génération (Story 4.3 — présentation soignée : en-tête, compteur, avertissement) ── */
 .schedule-actions {
   display: flex;
   align-items: center;
@@ -719,17 +719,43 @@ button:disabled:hover { filter: none; box-shadow: none; }
   flex-wrap: wrap;
   margin-bottom: 1em;
 }
-.schedule-count {
-  font-size: .82em;
+/* En-tête du résultat : libellé + compteur de sessions (UX-DR5). */
+.schedule-header {
+  display: flex;
+  align-items: baseline;
+  gap: .6em;
+  margin-bottom: .8em;
+  padding-bottom: .6em;
+  border-bottom: 1px solid var(--border);
+}
+.schedule-header-label {
+  font-size: .7em;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .08em;
+  letter-spacing: .1em;
   color: var(--text-muted);
-  margin-bottom: .7em;
 }
-.schedule-unscheduled {
-  margin-top: .9em;
+.schedule-count {
+  font-size: .9em;
+  font-weight: 600;
+  color: var(--primary-dark);
+}
+/* Avertissement « non planifiés » : alerte ambre (tokens partagés avec .form-error / indispos). */
+.schedule-warning {
+  margin-top: 1em;
+  padding: .7em .9em;
+  background: var(--indispo-bg);
+  border: 1px solid var(--indispo-tag-border);
+  border-radius: var(--radius-sm);
+}
+.schedule-warning-title {
   font-size: .88em;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: .25em;
+}
+.schedule-warning-reason {
+  font-size: .82em;
   color: var(--text-muted);
 }
 
@@ -777,6 +803,9 @@ button:disabled:hover { filter: none; box-shadow: none; }
   /* Options de génération : empilées pleine largeur (UX-DR7). */
   .gen-options { flex-direction: column; align-items: stretch; gap: .5em; }
   .gen-options-row input[type='date'] { width: 100%; }
+  /* Carte Résultat (Story 4.3) : pas de débordement horizontal des dates longues FR (UX-DR7, NFR5). */
+  .schedule-header { flex-wrap: wrap; gap: .3em .6em; }
+  .schedule-table td:first-child { white-space: normal; }
 }
 
 /* ── Motion ────────────────────────────────────────────────────────────── */
