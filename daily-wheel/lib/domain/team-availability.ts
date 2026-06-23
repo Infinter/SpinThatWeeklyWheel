@@ -5,8 +5,8 @@
 // `isTeamNonSessionDay` est l'UNIQUE source de vérité du « jour neutralisé » mandatée par AD-3 :
 // le même prédicat sera branché dans la boucle de génération ET le calcul de deadline EDF en
 // Story 4.2. Il agrège (en `||`) les 4 contraintes d'équipe. Branches câblées : « exclusions de groupe »
-// (3.1), « jours fériés » (3.2), « jours off » (3.3). Seule 4.1 (week-ends) AJOUTERA sa branche ici,
-// SANS toucher la signature.
+// (3.1), « jours fériés » (3.2), « jours off » (3.3), « week-ends » (4.1). Le prédicat est désormais
+// COMPLET ; la signature reste figée (consommée en 4.2).
 //
 // Calendrier : conversion `YYYY-MM-DD` → n° de jour absolu via l'algorithme entier
 // « days-from-civil » (Howard Hinnant). Sans `Date`, sans timezone, sans dérive DST — donc
@@ -25,8 +25,8 @@ export type GroupExclusionRule = {
 }
 
 // Contraintes d'équipe agrégées par `isTeamNonSessionDay` (AD-3). Forme COMPLÈTE déclarée dès 3.1.
-// `groupExclusions` (3.1), `holidays` (3.2) et `teamOffDays` (3.3) sont évalués ; seul `skipWeekends`
-// (4.1) est déclaré mais sans effet ici.
+// Les 4 champs sont désormais évalués : `groupExclusions` (3.1), `holidays` (3.2), `teamOffDays` (3.3)
+// et `skipWeekends` (4.1, conditionnel — neutralise les week-ends seulement si vrai).
 export type TeamConstraints = {
   skipWeekends?: boolean
   groupExclusions?: GroupExclusionRule[]
@@ -87,11 +87,21 @@ export function isTeamOffDay(offDays: DayOrRange[], date: string): boolean {
   return isPersonUnavailable(offDays, date)
 }
 
+// Vrai ssi `date` (YMD) tombe un week-end (samedi=6 / dimanche=0, via `weekdayOf`). PUR, sans `Date`.
+// C'est la base de la branche CONDITIONNELLE de `isTeamNonSessionDay` (Story 4.1) : un week-end ne
+// neutralise que si l'option « ignorer les week-ends » est active.
+export function isWeekend(date: string): boolean {
+  const dow = weekdayOf(date)
+  return dow === 0 || dow === 6
+}
+
 // UNIQUE prédicat « jour neutralisé » de l'équipe (AD-3). Story 3.1 : branche « exclusions de groupe ».
 // Story 3.2 : branche « jours fériés » AJOUTÉE en `||`. Story 3.3 : branche « jours off » AJOUTÉE en `||`.
-// Seule 4.1 (week-ends) ajoutera la sienne ici, sans changer la signature.
+// Story 4.1 : branche « week-ends » AJOUTÉE en `||`, CONDITIONNELLE (`ctx.skipWeekends === true`) — ≠ les
+// 3 autres, toujours actives. Le prédicat est désormais COMPLET ; signature inchangée (consommée en 4.2).
 export function isTeamNonSessionDay(date: string, ctx: TeamConstraints): boolean {
   return (
+    (ctx.skipWeekends === true && isWeekend(date)) ||
     isGroupExcluded(ctx.groupExclusions ?? [], date) ||
     isHoliday(ctx.holidays ?? [], date) ||
     isTeamOffDay(ctx.teamOffDays ?? [], date)

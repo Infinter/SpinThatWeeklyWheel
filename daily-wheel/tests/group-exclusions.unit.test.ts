@@ -77,7 +77,7 @@ describe('isGroupExcluded (AD-3 — récurrence, parité legacy isDateGroupExclu
   })
 })
 
-describe('isTeamNonSessionDay (AD-3 — source unique ; 3.1 = branche exclusions de groupe seulement)', () => {
+describe('isTeamNonSessionDay (AD-3 — source unique des 4 branches d’équipe ; ici : exclusions de groupe)', () => {
   it('jour couvert par une exclusion de groupe → true', () => {
     expect(isTeamNonSessionDay('2026-06-23', { groupExclusions: [rule({ every_n: 1 })] })).toBe(true)
   })
@@ -89,12 +89,8 @@ describe('isTeamNonSessionDay (AD-3 — source unique ; 3.1 = branche exclusions
   it('ctx sans groupExclusions → false', () => {
     expect(isTeamNonSessionDay('2026-06-23', {})).toBe(false)
   })
-
-  it('skipWeekends fourni n’a AUCUN effet (branche 4.1 non câblée)', () => {
-    // 2026-06-27 est un samedi ; skipWeekends est la SEULE branche encore non câblée → aucune neutralisation.
-    // (Les branches holidays/teamOffDays sont câblées depuis 3.2/3.3 et couvertes par leurs tests dédiés.)
-    expect(isTeamNonSessionDay('2026-06-27', { skipWeekends: true })).toBe(false)
-  })
+  // La branche week-ends (skipWeekends) est câblée depuis 4.1 → sa couverture vit dans
+  // tests/weekends.unit.test.ts (les branches holidays/teamOffDays dans leurs tests dédiés).
 })
 
 describe('isValidEveryN (AC1 — parité legacy L736 : isNaN || < 1 refusé)', () => {

@@ -472,6 +472,37 @@ button:disabled:hover { filter: none; box-shadow: none; }
 .group-excl-tag button:disabled { opacity: .5; }
 .group-excl-empty { font-size: .78em; color: var(--text-muted); font-style: italic; }
 
+/* ── Options de génération : bloc primaire non repliable (Story 4.1, FR9/FR10) ─ */
+.gen-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5em 1.4em;
+  margin-bottom: .8em;
+  padding-bottom: .8em;
+  border-bottom: 1px solid var(--border);
+}
+.gen-options.pending { opacity: .6; }
+.gen-options-row {
+  display: inline-flex;
+  align-items: center;
+  gap: .45em;
+  font-size: .85em;
+  color: var(--text-color);
+}
+.gen-options-row label { color: var(--text-muted); }
+.gen-options-row input[type='checkbox'] { width: 1.05em; height: 1.05em; accent-color: var(--primary); }
+.gen-options-row input[type='date'] {
+  padding: .32em .55em;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  font-size: .95em;
+  font-family: inherit;
+  color: var(--text-color);
+  background: var(--card-bg);
+}
+.gen-options-row input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
 /* ── Jours fériés : panneau repliable (Story 3.2, UX-DR4/UX-DR5) ─────────── */
 .holidays-toggle {
   display: inline-flex;
@@ -721,6 +752,9 @@ button:disabled:hover { filter: none; box-shadow: none; }
   .team-off-form input[type='text'],
   .team-off-form select { width: 100%; }
   .team-off-form button { justify-content: center; }
+  /* Options de génération : empilées pleine largeur (UX-DR7). */
+  .gen-options { flex-direction: column; align-items: stretch; gap: .5em; }
+  .gen-options-row input[type='date'] { width: 100%; }
 }
 
 /* ── Motion ────────────────────────────────────────────────────────────── */

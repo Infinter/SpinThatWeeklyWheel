@@ -17,3 +17,12 @@ export function formatDateFr(ymd: string): string {
     day: 'numeric',
   })
 }
+
+// Date du jour en `YYYY-MM-DD` LOCAL (défaut d'affichage de la date de début — Story 4.1, FR10).
+// CRITIQUE : formatage local via getFullYear/getMonth/getDate, JAMAIS toISOString() (UTC → décalage).
+export function todayYMD(): string {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}

@@ -28,12 +28,19 @@ import {
 } from '@/lib/data/group-exclusions'
 import { fetchHolidays, writeHoliday, type Holiday } from '@/lib/data/holidays'
 import { fetchTeamOffDays, writeTeamOffDay, type TeamOffDay } from '@/lib/data/team-off-days'
+import {
+  fetchSettings,
+  writeSettings,
+  type Setting,
+  type SettingWritePayload,
+} from '@/lib/data/settings'
 import { type ChangeEvent } from '@/lib/store/reconcile'
 import { participantsReducer, type StoreParticipant } from '@/lib/store/participants-reducer'
 import { unavailabilitiesReducer, type StoreUnavailability } from '@/lib/store/unavailabilities-reducer'
 import { groupExclusionsReducer, type StoreGroupExclusion } from '@/lib/store/group-exclusions-reducer'
 import { holidaysReducer, type StoreHoliday } from '@/lib/store/holidays-reducer'
 import { teamOffDaysReducer, type StoreTeamOffDay } from '@/lib/store/team-off-days-reducer'
+import { settingsReducer, DEFAULT_SETTING, type StoreSetting } from '@/lib/store/settings-reducer'
 import { isValidRange, isDuplicateDay, type DayOrRange } from '@/lib/domain/availability'
 import { isValidEveryN, refDateMatchesDayOfWeek } from '@/lib/domain/team-availability'
 import { parseNames } from '@/lib/store/parse-names'
@@ -77,6 +84,9 @@ function toServerHoliday(h: StoreHoliday): Holiday {
 function toServerTeamOffDay(o: StoreTeamOffDay): TeamOffDay {
   return { id: o.id, kind: o.kind, date1: o.date1, date2: o.date2, label: o.label, updated_at: o.updated_at }
 }
+function toServerSetting(s: StoreSetting): Setting {
+  return { id: s.id, skip_weekends: s.skip_weekends, start_date: s.start_date, updated_at: s.updated_at }
+}
 
 // Forme « optionnelle » des inputs d'une indispo, telle que fournie par l'UI.
 type UnavailabilityInput = { kind: 'day' | 'range'; date1: string; date2: string | null }
@@ -114,6 +124,10 @@ type StoreValue = {
   addTeamOffDay: (input: TeamOffDayInput) => void
   removeTeamOffDay: (id: string) => void
   retryTeamOffDay: (id: string) => void
+  settings: StoreSetting
+  setSkipWeekends: (value: boolean) => void
+  setStartDate: (date: string) => void
+  retrySettings: () => void
   error: string | null
   clearError: () => void
   passphraseNeeded: boolean
@@ -129,6 +143,7 @@ export function ParticipantsStoreProvider({
   initialGroupExclusions,
   initialHolidays,
   initialTeamOffDays,
+  initialSettings,
   children,
 }: {
   initial: Participant[]
@@ -136,6 +151,7 @@ export function ParticipantsStoreProvider({
   initialGroupExclusions: GroupExclusion[]
   initialHolidays: Holiday[]
   initialTeamOffDays: TeamOffDay[]
+  initialSettings: Setting | null
   children: ReactNode
 }) {
   const [participants, dispatch] = useReducer(participantsReducer, initial as StoreParticipant[])
@@ -151,6 +167,10 @@ export function ParticipantsStoreProvider({
   const [teamOffDays, dispatchO] = useReducer(
     teamOffDaysReducer,
     initialTeamOffDays as StoreTeamOffDay[],
+  )
+  const [settings, dispatchS] = useReducer(
+    settingsReducer,
+    (initialSettings ?? DEFAULT_SETTING) as StoreSetting,
   )
   const [error, setError] = useState<string | null>(null)
 
@@ -168,6 +188,7 @@ export function ParticipantsStoreProvider({
   const stateRefG = useRef(groupExclusions)
   const stateRefH = useRef(holidays)
   const stateRefO = useRef(teamOffDays)
+  const stateRefS = useRef(settings)
   useEffect(() => {
     stateRef.current = participants
   }, [participants])
@@ -183,6 +204,9 @@ export function ParticipantsStoreProvider({
   useEffect(() => {
     stateRefO.current = teamOffDays
   }, [teamOffDays])
+  useEffect(() => {
+    stateRefS.current = settings
+  }, [settings])
 
   // ── Participants ────────────────────────────────────────────────────────────
   // Chemin INTERNE par nom : crée une ligne optimiste + déclenche l'insert (réutilisé par addParticipants).
@@ -571,6 +595,41 @@ export function ParticipantsStoreProvider({
 
   const retryTeamOffDay = useCallback((id: string) => retry(id), [retry])
 
+  // ── Settings (Story 4.1) — patron SCALAIRE / upsert ───────────────────────────
+  // Mise à jour optimiste d'un patch partiel (FR9/FR10) : snapshot AVANT optimiste → RESTORE si échec.
+  // Pas de tempId (id constant 'singleton') ; op upsert via la file partagée (un seul prompt — AD-8).
+  const updateSettings = useCallback(
+    (patch: SettingWritePayload) => {
+      const snapshot = toServerSetting(stateRefS.current)
+      dispatchS({ type: 'OPTIMISTIC', patch })
+      void runWrite({
+        write: (pp) => writeSettings(patch, pp),
+        onConfirm: (r) => dispatchS({ type: 'CONFIRM', row: r as Setting }),
+        onFailed: () => dispatchS({ type: 'MARK_FAILED' }),
+        rollback: () => dispatchS({ type: 'RESTORE', row: snapshot }),
+        onConflictRehydrate: async () => {
+          try {
+            dispatchS({ type: 'HYDRATE', row: await fetchSettings() })
+          } catch {
+            /* Realtime prendra le relais. */
+          }
+        },
+        retryKey: 'settings',
+      })
+    },
+    [runWrite],
+  )
+
+  const setSkipWeekends = useCallback(
+    (value: boolean) => updateSettings({ skip_weekends: value }),
+    [updateSettings],
+  )
+  const setStartDate = useCallback(
+    (date: string) => updateSettings({ start_date: date }),
+    [updateSettings],
+  )
+  const retrySettings = useCallback(() => retry('settings'), [retry])
+
   const clearError = useCallback(() => setError(null), [])
 
   // ── Abonnement Realtime participants + re-hydratation à chaque (re)connexion (AD-6) ──────
@@ -710,6 +769,33 @@ export function ParticipantsStoreProvider({
     }
   }, [])
 
+  // ── 6ᵉ abonnement Realtime : settings (Story 4.1, AD-6) — ligne unique 'singleton' ──
+  useEffect(() => {
+    const channel = supabasePublic
+      .channel('settings-rt')
+      .on<Setting>(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'settings' },
+        (payload) => {
+          const event = mapChange<Setting>(payload)
+          if (event) dispatchS({ type: 'REALTIME', event })
+        },
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          fetchSettings()
+            .then((row) => dispatchS({ type: 'HYDRATE', row }))
+            .catch(() => {
+              /* refetch impossible : un prochain SUBSCRIBED réessaiera. */
+            })
+        }
+      })
+
+    return () => {
+      void supabasePublic.removeChannel(channel)
+    }
+  }, [])
+
   const value: StoreValue = {
     participants,
     addParticipants,
@@ -733,6 +819,10 @@ export function ParticipantsStoreProvider({
     addTeamOffDay,
     removeTeamOffDay,
     retryTeamOffDay,
+    settings,
+    setSkipWeekends,
+    setStartDate,
+    retrySettings,
     error,
     clearError,
     passphraseNeeded,
