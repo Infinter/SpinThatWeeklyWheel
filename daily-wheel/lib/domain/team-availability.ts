@@ -35,7 +35,8 @@ export type TeamConstraints = {
 }
 
 // N° de jour absolu (epoch 1970-01-01 = 0) — days-from-civil de Howard Hinnant. Pur, entier.
-function dayNumber(ymd: string): number {
+// EXPORTÉ (Story 4.2) : primitive calendaire partagée, base de `addDays`/`ymdFromDayNumber`.
+export function dayNumber(ymd: string): number {
   const [y, m, d] = ymd.split('-').map(Number)
   const yy = m <= 2 ? y - 1 : y
   const era = Math.floor((yy >= 0 ? yy : yy - 399) / 400)
@@ -43,6 +44,38 @@ function dayNumber(ymd: string): number {
   const doy = Math.floor((153 * (m > 2 ? m - 3 : m + 9) + 2) / 5) + d - 1
   const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy
   return era * 146097 + doe - 719468
+}
+
+// INVERSE exact de `dayNumber` (civil-from-days de Howard Hinnant) — n° de jour absolu → `YYYY-MM-DD`.
+// Pur, entier, sans `Date`. Story 4.2 (AC1) : pendant de `dayNumber`, prouvé par round-trip.
+export function ymdFromDayNumber(n: number): string {
+  const z = n + 719468
+  const era = Math.floor((z >= 0 ? z : z - 146096) / 146097)
+  const doe = z - era * 146097 // [0, 146096]
+  const yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365) // [0, 399]
+  const y = yoe + era * 400
+  const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100)) // [0, 365]
+  const mp = Math.floor((5 * doy + 2) / 153) // [0, 11]
+  const d = doy - Math.floor((153 * mp + 2) / 5) + 1 // [1, 31]
+  const m = mp < 10 ? mp + 3 : mp - 9 // [1, 12]
+  const year = m <= 2 ? y + 1 : y
+  return `${String(year).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+// Avance (ou recule, si `n < 0`) une date YMD de `n` jours, en arithmétique entière pure.
+// SEUL moyen autorisé d'itérer jour-par-jour dans la génération (≠ legacy `Date.setDate`) — AD-1.
+export function addDays(ymd: string, n: number): string {
+  return ymdFromDayNumber(dayNumber(ymd) + n)
+}
+
+// Avance une date YMD de `years` années en préservant mois/jour (parité legacy `setFullYear(+years)`).
+// Sert UNIQUEMENT à calculer la borne d'horizon (+1 an) de la génération. NUANCE : un 29 février
+// (bissextile) + 1 an produit une chaîne `AAAA-02-29` inexistante en année non bissextile ; comme
+// l'horizon est une simple BORNE D'ARRÊT comparée lexicographiquement (`cur <= lim`) et jamais
+// atteinte pour une équipe typique (NFR6 : ≤ 50 personnes, ≤ 1 an), c'est sans impact.
+export function addYears(ymd: string, years: number): string {
+  const [y, m, d] = ymd.split('-')
+  return `${String(Number(y) + years).padStart(4, '0')}-${m}-${d}`
 }
 
 // Jour de semaine 0=dimanche … 6=samedi (parité Date.getDay()).

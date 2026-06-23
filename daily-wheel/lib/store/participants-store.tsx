@@ -43,6 +43,13 @@ import { teamOffDaysReducer, type StoreTeamOffDay } from '@/lib/store/team-off-d
 import { settingsReducer, DEFAULT_SETTING, type StoreSetting } from '@/lib/store/settings-reducer'
 import { isValidRange, isDuplicateDay, type DayOrRange } from '@/lib/domain/availability'
 import { isValidEveryN, refDateMatchesDayOfWeek } from '@/lib/domain/team-availability'
+import {
+  generateSchedule,
+  type ScheduleInput,
+  type ScheduleResult,
+} from '@/lib/domain/schedule'
+import { createRng } from '@/lib/domain/rng'
+import { todayYMD } from '@/lib/format/date-fr'
 import { parseNames } from '@/lib/store/parse-names'
 import { useWriteQueue } from '@/lib/store/use-write-queue'
 
@@ -128,6 +135,10 @@ type StoreValue = {
   setSkipWeekends: (value: boolean) => void
   setStartDate: (date: string) => void
   retrySettings: () => void
+  // Résultat de génération ÉPHÉMÈRE (Story 4.2) — calcul client pur, NON persisté (ni table, ni
+  // Realtime, ni écriture). `null` tant qu'aucune génération n'a été lancée. Recalculé à chaque clic.
+  schedule: ScheduleResult | null
+  generate: () => void
   error: string | null
   clearError: () => void
   passphraseNeeded: boolean
@@ -173,6 +184,8 @@ export function ParticipantsStoreProvider({
     (initialSettings ?? DEFAULT_SETTING) as StoreSetting,
   )
   const [error, setError] = useState<string | null>(null)
+  // Résultat de génération ÉPHÉMÈRE (Story 4.2) : calcul client pur, jamais persisté ni hydraté.
+  const [schedule, setSchedule] = useState<ScheduleResult | null>(null)
 
   // File d'écriture partagée + passphrase (extraite en 3.2). TABLE-AGNOSTIQUE : un seul prompt pour N (AD-8).
   const { runWrite, retry, passphraseNeeded, submitPassphrase, cancelPassphrase } = useWriteQueue({ setError })
@@ -630,6 +643,37 @@ export function ParticipantsStoreProvider({
   )
   const retrySettings = useCallback(() => retry('settings'), [retry])
 
+  // ── Génération du planning (Story 4.2, FR11/FR14) ──────────────────────────────
+  // Calcul client PUR et ÉPHÉMÈRE : assemble l'entrée du domaine (actifs + leurs indispos + contraintes
+  // d'équipe + date de début), tire un seed ALÉATOIRE (Math.random AUTORISÉ ici — hors de la feuille
+  // domaine, AD-2), appelle `generateSchedule` et pose le résultat dans le state. Aucune persistance :
+  // pas d'écriture, pas de Realtime, pas de réconciliation. Un rechargement efface le résultat (attendu).
+  const generate = useCallback(() => {
+    const actives = participants.filter((p) => p.active === true)
+    const input: ScheduleInput = {
+      participants: actives.map((p) => ({
+        id: p.id,
+        name: p.name,
+        unavailabilities: unavailabilities
+          .filter((u) => u.participant_id === p.id)
+          .map((u) => ({ kind: u.kind, date1: u.date1, date2: u.date2 })),
+      })),
+      constraints: {
+        skipWeekends: settings.skip_weekends,
+        groupExclusions: groupExclusions.map((g) => ({
+          day_of_week: g.day_of_week,
+          every_n: g.every_n,
+          ref_date: g.ref_date,
+        })),
+        holidays: holidays.map((h) => ({ date: h.date })),
+        teamOffDays: teamOffDays.map((o) => ({ kind: o.kind, date1: o.date1, date2: o.date2 })),
+      },
+      startDate: settings.start_date ?? todayYMD(),
+    }
+    const seed = Math.floor(Math.random() * 0x100000000)
+    setSchedule(generateSchedule(input, createRng(seed)))
+  }, [participants, unavailabilities, groupExclusions, holidays, teamOffDays, settings])
+
   const clearError = useCallback(() => setError(null), [])
 
   // ── Abonnement Realtime participants + re-hydratation à chaque (re)connexion (AD-6) ──────
@@ -823,6 +867,8 @@ export function ParticipantsStoreProvider({
     setSkipWeekends,
     setStartDate,
     retrySettings,
+    schedule,
+    generate,
     error,
     clearError,
     passphraseNeeded,

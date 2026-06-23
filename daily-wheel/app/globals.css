@@ -711,6 +711,28 @@ button:disabled:hover { filter: none; box-shadow: none; }
 .team-off-tag button:disabled { opacity: .5; }
 .team-off-empty { font-size: .78em; color: var(--text-muted); font-style: italic; }
 
+/* ── Résultat de génération (Story 4.2 — rendu MINIMAL ; présentation soignée = Story 4.3) ── */
+.schedule-actions {
+  display: flex;
+  align-items: center;
+  gap: .8em;
+  flex-wrap: wrap;
+  margin-bottom: 1em;
+}
+.schedule-count {
+  font-size: .82em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  margin-bottom: .7em;
+}
+.schedule-unscheduled {
+  margin-top: .9em;
+  font-size: .88em;
+  color: var(--text-muted);
+}
+
 /* ── Responsive (≤ 520px) ──────────────────────────────────────────────── */
 @media (max-width: 520px) {
   body { padding: 1.2em .8em 3em; }

@@ -10,6 +10,7 @@ import { GenerationOptions } from '@/components/GenerationOptions'
 import { GroupExclusionsPanel } from '@/components/GroupExclusionsPanel'
 import { HolidaysPanel } from '@/components/HolidaysPanel'
 import { TeamOffDaysPanel } from '@/components/TeamOffDaysPanel'
+import { ScheduleResult } from '@/components/ScheduleResult'
 
 // Rendu DYNAMIQUE (AC8) : l'état est live et partagé (FR13), pas de prérendu statique.
 // Les fetchs tournent aussi côté serveur (NEXT_PUBLIC_* seulement).
@@ -68,14 +69,13 @@ export default async function Home() {
             <HolidaysPanel />
             <TeamOffDaysPanel />
           </section>
-        </ParticipantsStoreProvider>
 
-        <section className="card" aria-labelledby="card-resultat">
-          <h2 id="card-resultat" className="card-title">Résultat</h2>
-          <p className="card-empty">
-            Le planning généré s’affichera ici.
-          </p>
-        </section>
+          {/* Carte Résultat DANS le provider : le bouton « Lancer » et l'affichage consomment le store. */}
+          <section className="card" aria-labelledby="card-resultat">
+            <h2 id="card-resultat" className="card-title">Résultat</h2>
+            <ScheduleResult />
+          </section>
+        </ParticipantsStoreProvider>
       </main>
     </>
   );
