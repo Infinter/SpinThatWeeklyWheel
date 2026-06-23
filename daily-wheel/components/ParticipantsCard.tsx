@@ -1,9 +1,10 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import { useParticipants } from '@/lib/store/participants-store'
 import { parseNames } from '@/lib/store/parse-names'
 import { PassphrasePrompt } from '@/components/PassphrasePrompt'
+import { UnavailabilityPanel } from '@/components/UnavailabilityPanel'
 
 // Carte « Participants » interactive (Story 2.1 + 2.2). Tout en français (NFR4), charte CSS existante.
 // UI pure : aucune écriture directe — tout passe par le store (AD-11).
@@ -17,6 +18,7 @@ export function ParticipantsCard() {
     renameParticipant,
     deleteParticipant,
     retryParticipant,
+    unavailabilities,
     error,
     clearError,
   } = useParticipants()
@@ -25,6 +27,8 @@ export function ParticipantsCard() {
   // État d'édition inline LOCAL au composant (jamais dans le store) — Story 2.2.
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  // Panneau d'indispos ouvert (un seul à la fois) — état LOCAL, jamais dans le store (Story 2.3).
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   // Évite qu'un blur déclenché par Échap ne committe le renommage annulé.
   const skipBlurRef = useRef(false)
 
@@ -120,9 +124,12 @@ export function ParticipantsCard() {
             </tr>
           </thead>
           <tbody>
-            {participants.map((p) => (
+            {participants.map((p) => {
+              const indispoCount = unavailabilities.filter((u) => u.participant_id === p.id).length
+              const expanded = expandedId === p.id
+              return (
+              <Fragment key={p.id}>
               <tr
-                key={p.id}
                 className={[
                   'participant-row',
                   p.active ? '' : 'inactif',
@@ -174,6 +181,15 @@ export function ParticipantsCard() {
                         <button
                           type="button"
                           className="btn-secondary btn-row"
+                          aria-expanded={expanded}
+                          onClick={() => setExpandedId(expanded ? null : p.id)}
+                        >
+                          Indispos
+                          {indispoCount > 0 && <span className="indispo-badge">{indispoCount}</span>}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-row"
                           disabled={p.pending}
                           onClick={() => startEdit(p.id, p.name)}
                         >
@@ -192,7 +208,16 @@ export function ParticipantsCard() {
                   )}
                 </td>
               </tr>
-            ))}
+              {expanded && (
+                <tr className="indispo-row">
+                  <td colSpan={3}>
+                    <UnavailabilityPanel participantId={p.id} />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
+              )
+            })}
           </tbody>
         </table>
       )}

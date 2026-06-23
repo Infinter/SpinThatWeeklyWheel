@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-06-22
-last_updated: 2026-06-22
+last_updated: 2026-06-23
 project: SpinThatWeeklyWheel
 project_key: NOKEY
 tracking_system: file-system
@@ -54,6 +54,9 @@ story_location: _bmad-output/implementation-artifacts
 # 2026-06-22 — Story 2.2 contextée (Amelia/create-story) : backlog → ready-for-dev.
 # 2026-06-22 — Story 2.2 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
 # 2026-06-22 — Story 2.2 implémentée (Amelia/dev-story) : in-progress → review.
+# 2026-06-22 — Story 2.3 contextée (Amelia/create-story) : backlog → ready-for-dev.
+# 2026-06-23 — Story 2.3 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
+# 2026-06-23 — Story 2.3 implémentée (Amelia/dev-story) : in-progress → review.
 
 development_status:
   epic-1: in-progress
@@ -66,7 +69,7 @@ development_status:
   epic-2: in-progress
   2-1-ajout-multiple-et-liste-des-participants: review
   2-2-activer-desactiver-renommer-supprimer-participant: review
-  2-3-indisponibilites-individuelles-jour-isole-plage: backlog
+  2-3-indisponibilites-individuelles-jour-isole-plage: review
   epic-2-retrospective: optional
   epic-3: backlog
   3-1-exclusions-de-groupe-recurrentes: backlog

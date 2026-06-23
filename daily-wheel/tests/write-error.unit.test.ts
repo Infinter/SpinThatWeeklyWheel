@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { writeErrorFromStatus } from '@/lib/data/participants'
+import { writeErrorFromStatus } from '@/lib/data/write-error'
 
 // Test UNITAIRE pur (aucun réseau, aucune variable d'env) : il fixe la taxonomie
 // d'erreurs d'écriture (AD-17). C'est le vrai filet du mapping statut HTTP → classe.

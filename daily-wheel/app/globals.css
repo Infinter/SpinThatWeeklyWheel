@@ -272,6 +272,100 @@ button:disabled:hover { filter: none; box-shadow: none; }
 }
 .passphrase-row { display: flex; gap: .5em; flex-wrap: wrap; }
 
+/* ── Indispos : badge sur le bouton toggle (Story 2.3, UX-DR5) ─────────── */
+.indispo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  padding: 0 .35em;
+  margin-left: .15em;
+  border-radius: 1em;
+  background: var(--indispo-tag-border);
+  color: #fff;
+  font-size: .72em;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Indispos : panneau repliable inline (Story 2.3, UX-DR4) ───────────── */
+.indispo-row td { padding: 0; }
+.indispo-panel {
+  padding: .9em 1.1em;
+  background: var(--indispo-bg);
+  border-top: 2px solid var(--indispo-border);
+}
+.indispo-panel-title {
+  font-weight: 700;
+  font-size: .72em;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #92400e;
+  margin-bottom: .6em;
+}
+.indispo-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45em;
+  align-items: center;
+  margin-bottom: .7em;
+}
+.indispo-form label { font-size: .8em; color: var(--text-muted); }
+.indispo-form input[type='date'],
+.indispo-form select {
+  padding: .32em .55em;
+  border: 1px solid var(--indispo-border);
+  border-radius: var(--radius-sm);
+  font-size: .82em;
+  font-family: inherit;
+  color: var(--text-color);
+  background: var(--card-bg);
+}
+.indispo-form input[type='date']:focus-visible,
+.indispo-form select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+/* Bouton « Ajouter » compact, plat (sans dégradé), ton ambre du panneau. */
+.indispo-form button {
+  padding: .35em .8em;
+  font-size: .82em;
+  background: var(--indispo-tag-border);
+  box-shadow: none;
+}
+.indispo-form button:hover { filter: brightness(1.06); box-shadow: none; }
+
+.indispo-tags { display: flex; flex-wrap: wrap; gap: .4em; }
+.indispo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: .3em;
+  background: var(--indispo-tag-bg);
+  border: 1px solid var(--indispo-tag-border);
+  border-radius: 20px;
+  padding: .22em .65em;
+  font-size: .77em;
+  color: #92400e;
+  font-weight: 500;
+}
+.indispo-tag.pending { opacity: .55; }
+.indispo-tag.failed { outline: 1px solid #dc2626; }
+/* Bouton ✕ : plat, discret, vire au rouge au survol. */
+.indispo-tag button {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  filter: none;
+  color: var(--indispo-tag-border);
+  font-size: .9em;
+  line-height: 1;
+  border: none;
+}
+.indispo-tag button:hover { color: #dc2626; background: none; box-shadow: none; filter: none; }
+.indispo-tag button:disabled { opacity: .5; }
+.indispo-empty { font-size: .78em; color: var(--text-muted); font-style: italic; }
+
 /* ── Responsive (≤ 520px) ──────────────────────────────────────────────── */
 @media (max-width: 520px) {
   body { padding: 1.2em .8em 3em; }
@@ -283,10 +377,16 @@ button:disabled:hover { filter: none; box-shadow: none; }
   .participant-table th,
   .participant-table td { padding: .5em .45em; }
   .participant-table th { font-size: .74em; }
-  /* Actions empilées : deux boutons courts restent tappables sans déborder. */
+  /* Actions empilées : les boutons courts restent tappables sans déborder. */
   .row-actions { flex-direction: column; gap: .3em; }
   .btn-row,
   .btn-retry { padding: .3em .5em; font-size: .78em; }
+  /* Panneau indispos : formulaire empilé, pas de débordement horizontal (UX-DR7). */
+  .indispo-panel { padding: .7em .6em; }
+  .indispo-form { flex-direction: column; align-items: stretch; gap: .35em; }
+  .indispo-form input[type='date'],
+  .indispo-form select { width: 100%; }
+  .indispo-form button { justify-content: center; }
 }
 
 /* ── Motion ────────────────────────────────────────────────────────────── */

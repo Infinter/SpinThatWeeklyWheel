@@ -1,25 +1,29 @@
 import type { Participant } from '@/lib/data/participants'
+import type { Unavailability } from '@/lib/data/unavailabilities'
 
-// Réducteur de réconciliation PUR (Story 1.5, AC1/AC10). Applique un événement Realtime
-// `postgres_changes` à la copie de travail locale (AD-4 : Supabase reste la source canonique).
+// Réducteur de réconciliation PUR (Story 1.5, AC1/AC10 ; généralisé en Story 2.3, AC4).
+// Applique un événement Realtime `postgres_changes` à la copie de travail locale
+// (AD-4 : Supabase reste la source canonique).
 //
-// Invariants protégés par tests/reconcile.unit.test.ts :
+// Invariants protégés par tests/reconcile.unit.test.ts (+ unavailabilities-reducer.unit.test.ts) :
 //   - AD-15 : un écho de notre propre écriture (même `id` ET même `updated_at`) est ignoré.
 //   - AD-16 : Last-Write-Wins ordonné par `updated_at` (chaîne ISO comparable lexicographiquement).
 //
 // AUCUNE dépendance React / Supabase / `Date` : fonction pure, testable sans réseau ni env.
 
 // Événement minimal mappé depuis le payload `postgres_changes`
-// (`payload.eventType` / `payload.new` / `payload.old`).
-export type ParticipantChangeEvent =
-  | { eventType: 'INSERT'; new: Participant }
-  | { eventType: 'UPDATE'; new: Participant }
+// (`payload.eventType` / `payload.new` / `payload.old`). Générique sur la forme de ligne `T`.
+export type ChangeEvent<T> =
+  | { eventType: 'INSERT'; new: T }
+  | { eventType: 'UPDATE'; new: T }
   | { eventType: 'DELETE'; old: { id: string } }
 
-export function reconcileParticipants(
-  state: Participant[],
-  event: ParticipantChangeEvent,
-): Participant[] {
+// Réconciliation GÉNÉRIQUE par `id` (AD-15 dédup / AD-16 LWW). Toute ligne avec `id` + `updated_at`
+// (chaîne comparable) est réconciliable : participants (1.5) ET indisponibilités (2.3).
+export function reconcileById<T extends { id: string; updated_at: string }>(
+  state: T[],
+  event: ChangeEvent<T>,
+): T[] {
   switch (event.eventType) {
     case 'DELETE': {
       const id = event.old?.id
@@ -44,7 +48,7 @@ export function reconcileParticipants(
       // AD-15 : même id ET même updated_at → écho de notre propre écriture, déjà appliqué → ignorer.
       if (local.updated_at === incoming.updated_at) return state
 
-      // AD-16 : Last-Write-Wins. L'entrant n'écrase que s'il est ≥ au local (ici : strictement plus récent).
+      // AD-16 : Last-Write-Wins. L'entrant n'écrase que s'il est strictement plus récent.
       if (incoming.updated_at < local.updated_at) return state
 
       const next = state.slice()
@@ -55,4 +59,23 @@ export function reconcileParticipants(
     default:
       return state
   }
+}
+
+// ── Alias typés (non-régression + lisibilité des call-sites) ──────────────────
+export type ParticipantChangeEvent = ChangeEvent<Participant>
+export type UnavailabilityChangeEvent = ChangeEvent<Unavailability>
+
+// Conserve la signature historique (Story 1.5) : `tests/reconcile.unit.test.ts` reste vert.
+export function reconcileParticipants(
+  state: Participant[],
+  event: ParticipantChangeEvent,
+): Participant[] {
+  return reconcileById(state, event)
+}
+
+export function reconcileUnavailabilities(
+  state: Unavailability[],
+  event: UnavailabilityChangeEvent,
+): Unavailability[] {
+  return reconcileById(state, event)
 }

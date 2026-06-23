@@ -1,4 +1,5 @@
 import { supabasePublic } from '@/lib/supabase/client'
+import { WriteError, writeErrorFromStatus, type WriteErrorKind } from '@/lib/data/write-error'
 
 // `lib/data/` est le SEUL point de contact Supabase (AD-11) : aucun composant/hook ne fait `.from(...)`.
 // Lectures via la clé low-privilege (AD-7) ; les écritures passeront par `app/api/` (Story 1.4).
@@ -21,32 +22,11 @@ export async function fetchParticipants(): Promise<Participant[]> {
 
 // ── Écritures : routées via le proxy serveur `/api/participants` (AD-7), JAMAIS client-direct.
 
-// Classes d'erreur d'écriture (AD-17) — guident le futur traitement optimiste (1.5) :
-//   auth       → re-prompt passphrase, pas de retry, pas de rollback silencieux
-//   validation → rollback de l'optimiste
-//   conflict   → re-hydrater puis ré-appliquer (AD-16)
-//   transient  → retry possible
-export type WriteErrorKind = 'auth' | 'validation' | 'conflict' | 'transient'
-
-export class WriteError extends Error {
-  readonly kind: WriteErrorKind
-  readonly status: number
-  constructor(status: number, message: string) {
-    super(message)
-    this.name = 'WriteError'
-    this.status = status
-    this.kind = writeErrorFromStatus(status)
-  }
-}
-
-// Fonction PURE : mappe un statut HTTP vers une classe d'erreur (AD-17). Testée unitairement.
-export function writeErrorFromStatus(status: number): WriteErrorKind {
-  if (status === 401) return 'auth'
-  if (status === 400) return 'validation'
-  if (status === 409) return 'conflict'
-  // 5xx et tout statut inattendu : prudence → transitoire (retry possible).
-  return 'transient'
-}
+// Taxonomie d'erreurs d'écriture (AD-17) extraite dans `write-error.ts` (Story 2.3, partagée
+// avec `unavailabilities.ts`). Importée ci-dessus pour usage local (`writeParticipant`) et
+// re-exportée ici pour non-régression des imports existants (`participants-store.tsx`,
+// `tests/write-error.unit.test.ts` importent `@/lib/data/participants`).
+export { WriteError, writeErrorFromStatus, type WriteErrorKind }
 
 export type WriteOp = 'insert' | 'update' | 'delete'
 export type WritePayload = { id?: string; data?: Partial<Pick<Participant, 'name' | 'active'>> }

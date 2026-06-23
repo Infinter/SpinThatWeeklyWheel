@@ -1,20 +1,20 @@
 import { fetchParticipants, type Participant } from '@/lib/data/participants'
+import { fetchUnavailabilities, type Unavailability } from '@/lib/data/unavailabilities'
 import { ParticipantsStoreProvider } from '@/lib/store/participants-store'
 import { ParticipantsCard } from '@/components/ParticipantsCard'
 
 // Rendu DYNAMIQUE (AC8) : l'état est live et partagé (FR13), pas de prérendu statique.
-// `fetchParticipants()` (1.3) tourne aussi côté serveur (n'utilise que des NEXT_PUBLIC_*).
+// `fetchParticipants()`/`fetchUnavailabilities()` tournent aussi côté serveur (NEXT_PUBLIC_* seulement).
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
-  // SSR de l'état initial → passé en `initial` au provider client (pas de flash de chargement).
-  let initial: Participant[] = []
-  try {
-    initial = await fetchParticipants()
-  } catch {
-    // Fetch initial impossible : l'app reste utilisable ; Realtime + re-hydratation (AD-6) prendront le relais.
-    initial = []
-  }
+  // SSR de l'état initial → passé au provider client (pas de flash de chargement).
+  // Les deux fetchs en parallèle, INDÉPENDANTS : l'échec de l'un retombe sur [] sans perdre l'autre
+  // (Realtime + re-hydratation AD-6 prennent le relais).
+  const [initial, initialUnavailabilities] = await Promise.all([
+    fetchParticipants().catch((): Participant[] => []),
+    fetchUnavailabilities().catch((): Unavailability[] => []),
+  ])
 
   return (
     <>
@@ -32,7 +32,7 @@ export default async function Home() {
       </header>
 
       <main className="container">
-        <ParticipantsStoreProvider initial={initial}>
+        <ParticipantsStoreProvider initial={initial} initialUnavailabilities={initialUnavailabilities}>
           <ParticipantsCard />
         </ParticipantsStoreProvider>
 
