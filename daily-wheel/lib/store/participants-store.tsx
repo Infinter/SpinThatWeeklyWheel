@@ -144,6 +144,9 @@ type StoreValue = {
   passphraseNeeded: boolean
   submitPassphrase: (value: string) => void
   cancelPassphrase: () => void
+  // État de protection annoncé dans la barre supérieure (Story 5.1, UX-DR8) : déverrouillée si une
+  // passphrase est mémorisée pour la session, verrouillée sinon. Miroir lecture-seule, aucune écriture.
+  unlocked: boolean
 }
 
 const ParticipantsContext = createContext<StoreValue | null>(null)
@@ -188,7 +191,8 @@ export function ParticipantsStoreProvider({
   const [schedule, setSchedule] = useState<ScheduleResult | null>(null)
 
   // File d'écriture partagée + passphrase (extraite en 3.2). TABLE-AGNOSTIQUE : un seul prompt pour N (AD-8).
-  const { runWrite, retry, passphraseNeeded, submitPassphrase, cancelPassphrase } = useWriteQueue({ setError })
+  const { runWrite, retry, passphraseNeeded, submitPassphrase, cancelPassphrase, unlocked } =
+    useWriteQueue({ setError })
 
   const seqRef = useRef(0) // ids temporaires d'insert participant (`temp:<n>`).
   const useqRef = useRef(0) // ids temporaires d'insert indispo (`utemp:<n>`).
@@ -874,6 +878,7 @@ export function ParticipantsStoreProvider({
     passphraseNeeded,
     submitPassphrase,
     cancelPassphrase,
+    unlocked,
   }
 
   return <ParticipantsContext.Provider value={value}>{children}</ParticipantsContext.Provider>

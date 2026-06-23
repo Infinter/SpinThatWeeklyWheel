@@ -11,6 +11,8 @@ import { GroupExclusionsPanel } from '@/components/GroupExclusionsPanel'
 import { HolidaysPanel } from '@/components/HolidaysPanel'
 import { TeamOffDaysPanel } from '@/components/TeamOffDaysPanel'
 import { ScheduleResult } from '@/components/ScheduleResult'
+import { ProtectionBanner } from '@/components/ProtectionBanner'
+import { GuidedStepper } from '@/components/GuidedStepper'
 
 // Rendu DYNAMIQUE (AC8) : l'état est live et partagé (FR13), pas de prérendu statique.
 // Les fetchs tournent aussi côté serveur (NEXT_PUBLIC_* seulement).
@@ -37,7 +39,15 @@ export default async function Home() {
   ])
 
   return (
-    <>
+    // Provider étendu à TOUTE la page (Story 5.1) : le bandeau de protection et le stepper consomment le store.
+    <ParticipantsStoreProvider
+      initial={initial}
+      initialUnavailabilities={initialUnavailabilities}
+      initialGroupExclusions={initialGroupExclusions}
+      initialHolidays={initialHolidays}
+      initialTeamOffDays={initialTeamOffDays}
+      initialSettings={initialSettings}
+    >
       <header className="app-header">
         <div className="app-header-icon" aria-hidden="true">
           🎲
@@ -49,34 +59,41 @@ export default async function Home() {
             respectées
           </p>
         </div>
+        {/* Protection annoncée d'emblée (UX-DR8) ; saisie passphrase paresseuse inchangée. */}
+        <ProtectionBanner />
       </header>
 
+      {/* Parcours guidé COLLANT : 1 Équipe · 2 Contraintes · 3 Spin. Repère, pas un wizard (AC-4). */}
+      <GuidedStepper />
+
       <main className="container">
-        <ParticipantsStoreProvider
-          initial={initial}
-          initialUnavailabilities={initialUnavailabilities}
-          initialGroupExclusions={initialGroupExclusions}
-          initialHolidays={initialHolidays}
-          initialTeamOffDays={initialTeamOffDays}
-          initialSettings={initialSettings}
-        >
+        {/* Ancres de défilement du stepper (AC-3). */}
+        <div id="surface-equipe" className="surface-anchor">
           <ParticipantsCard />
+        </div>
 
-          <section className="card" aria-labelledby="card-options">
-            <h2 id="card-options" className="card-title">Options</h2>
-            <GenerationOptions />
-            <GroupExclusionsPanel />
-            <HolidaysPanel />
-            <TeamOffDaysPanel />
-          </section>
+        <section
+          id="surface-contraintes"
+          className="card surface-anchor"
+          aria-labelledby="card-options"
+        >
+          <h2 id="card-options" className="card-title">Options</h2>
+          <GenerationOptions />
+          <GroupExclusionsPanel />
+          <HolidaysPanel />
+          <TeamOffDaysPanel />
+        </section>
 
-          {/* Carte Résultat DANS le provider : le bouton « Lancer » et l'affichage consomment le store. */}
-          <section className="card" aria-labelledby="card-resultat">
-            <h2 id="card-resultat" className="card-title">Résultat</h2>
-            <ScheduleResult />
-          </section>
-        </ParticipantsStoreProvider>
+        {/* Carte Résultat DANS le provider : le bouton « Lancer » et l'affichage consomment le store. */}
+        <section
+          id="surface-spin"
+          className="card surface-anchor"
+          aria-labelledby="card-resultat"
+        >
+          <h2 id="card-resultat" className="card-title">Résultat</h2>
+          <ScheduleResult />
+        </section>
       </main>
-    </>
+    </ParticipantsStoreProvider>
   );
 }

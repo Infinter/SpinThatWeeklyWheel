@@ -1,5 +1,5 @@
 # generated: 2026-06-22
-# last_updated: 2026-06-22
+# last_updated: 2026-06-23
 # project: SpinThatWeeklyWheel
 # project_key: NOKEY
 # tracking_system: file-system
@@ -75,6 +75,10 @@ story_location: _bmad-output/implementation-artifacts
 # 2026-06-23 — Story 4.3 contextée (Amelia/create-story) : backlog → ready-for-dev (epic-4 déjà in-progress ; dernière story d'Epic 4).
 # 2026-06-23 — Story 4.3 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
 # 2026-06-23 — Story 4.3 implémentée (Amelia/dev-story) : in-progress → review. Clôt l'implémentation d'Epic 4.
+# 2026-06-23 — Sprint planning (Amelia) : Epic 5 « Redesign UX » (5.1→5.9) ajouté depuis epics.md ; epic-5 + stories en backlog.
+# 2026-06-23 — Story 5.1 contextée (Amelia/create-story) : backlog → ready-for-dev ; epic-5 backlog → in-progress (1ère story).
+# 2026-06-23 — Story 5.1 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
+# 2026-06-23 — Story 5.1 implémentée (Amelia/dev-story) : in-progress → review.
 
 development_status:
   epic-1: in-progress
@@ -99,3 +103,14 @@ development_status:
   4-2-algorithme-edf-integrant-toutes-les-contraintes: review
   4-3-affichage-planning-et-non-planifies: review
   epic-4-retrospective: optional
+  epic-5: in-progress
+  5-1-parcours-guide-stepper-protection-annoncee: review
+  5-2-regle-rotation-horizon-etendu: backlog
+  5-3-timeline-visuelle-grille-multi-lignes-sans-scrollbar: backlog
+  5-4-roue-animee-theatre-revelation-resultat-edf: backlog
+  5-5-deux-modes-rotation-complete-jour-le-jour: backlog
+  5-6-persistance-rotation-mode-jour-le-jour: backlog
+  5-7-exports-slack-csv-avec-apercu: backlog
+  5-8-microcopie-branding-accessibilite-mouvement: backlog
+  5-9-navigation-edition-rapide-entre-etapes: backlog
+  epic-5-retrospective: optional

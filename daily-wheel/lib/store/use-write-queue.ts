@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react'
 import { WriteError } from '@/lib/data/write-error'
 
 // File d'écriture partagée du team store (extraite du provider en Story 3.2, [[store-extraction-plan]]).
@@ -20,9 +20,24 @@ function readPassphrase(): string | null {
 }
 function storePassphrase(value: string): void {
   if (typeof window !== 'undefined') window.sessionStorage.setItem(PASSPHRASE_KEY, value)
+  emitPassphraseChange()
 }
 function clearPassphrase(): void {
   if (typeof window !== 'undefined') window.sessionStorage.removeItem(PASSPHRASE_KEY)
+  emitPassphraseChange()
+}
+
+// ── État de protection annoncé (Story 5.1, UX-DR8) ───────────────────────────
+// sessionStorage n'est pas observable en intra-onglet (l'event `storage` est cross-onglet seulement).
+// Mini pub/sub : store/clear notifient → `useSyncExternalStore` resnapshote. Hydratation-safe via le
+// snapshot serveur (`false`), donc PAS de mismatch ; au rechargement le snapshot client lit la session.
+const passphraseListeners = new Set<() => void>()
+function emitPassphraseChange(): void {
+  for (const l of passphraseListeners) l()
+}
+function subscribePassphrase(cb: () => void): () => void {
+  passphraseListeners.add(cb)
+  return () => passphraseListeners.delete(cb)
 }
 
 // Spécification d'une écriture serveur, TABLE-AGNOSTIQUE (Story 2.3) : porte ses propres thunks.
@@ -44,10 +59,20 @@ export type WriteQueue = {
   passphraseNeeded: boolean
   submitPassphrase: (value: string) => void
   cancelPassphrase: () => void
+  // Miroir LECTURE-SEULE de la présence d'une passphrase en sessionStorage (Story 5.1, UX-DR8) :
+  // `false` = verrouillée (aucune passphrase) ; `true` = déverrouillée. Réactif (storage non observable).
+  unlocked: boolean
 }
 
 export function useWriteQueue({ setError }: { setError: (message: string | null) => void }): WriteQueue {
   const [passphraseNeeded, setPassphraseNeeded] = useState(false)
+  // Déverrouillée ssi une passphrase est mémorisée. Snapshot serveur `false` → pas de mismatch d'hydratation ;
+  // store/clear émettent → re-render. cancelPassphrase ne touche pas la session → l'état reste cohérent.
+  const unlocked = useSyncExternalStore(
+    subscribePassphrase,
+    () => readPassphrase() !== null,
+    () => false,
+  )
 
   const writeSeqRef = useRef(0) // clés uniques de file passphrase (`w:<n>`).
   // Écritures en attente d'une passphrase (sans passphrase, ou re-prompt après 401) → rejouées après saisie (AC5).
@@ -87,7 +112,7 @@ export function useWriteQueue({ setError }: { setError: (message: string | null)
       }
       // Taxonomie d'erreurs d'écriture (AD-17).
       switch (e.kind) {
-        case 'auth': // 401 : passphrase invalide → effacer, re-prompt, rejouer après saisie (AC5).
+        case 'auth': // 401 : passphrase invalide → effacer (repasse « verrouillée », UX-DR8), re-prompt, rejouer (AC5).
           clearPassphrase()
           pendingWritesRef.current.set(writeKey, spec)
           spec.onPending?.()
@@ -136,7 +161,7 @@ export function useWriteQueue({ setError }: { setError: (message: string | null)
     (value: string) => {
       const v = value.trim()
       if (!v) return
-      storePassphrase(v)
+      storePassphrase(v) // passe « déverrouillée » (UX-DR8) — validité réelle confirmée par le serveur au write.
       setPassphraseNeeded(false)
       // Rejoue TOUTES les écritures en file (toutes tables confondues) — un seul prompt pour N (AC5).
       const queued = Array.from(pendingWritesRef.current.values())
@@ -154,5 +179,5 @@ export function useWriteQueue({ setError }: { setError: (message: string | null)
     for (const spec of queued) spec.rollback()
   }, [])
 
-  return { runWrite, retry, passphraseNeeded, submitPassphrase, cancelPassphrase }
+  return { runWrite, retry, passphraseNeeded, submitPassphrase, cancelPassphrase, unlocked }
 }
