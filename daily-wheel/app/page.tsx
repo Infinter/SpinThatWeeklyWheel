@@ -1,19 +1,22 @@
 import { fetchParticipants, type Participant } from '@/lib/data/participants'
 import { fetchUnavailabilities, type Unavailability } from '@/lib/data/unavailabilities'
+import { fetchGroupExclusions, type GroupExclusion } from '@/lib/data/group-exclusions'
 import { ParticipantsStoreProvider } from '@/lib/store/participants-store'
 import { ParticipantsCard } from '@/components/ParticipantsCard'
+import { GroupExclusionsPanel } from '@/components/GroupExclusionsPanel'
 
 // Rendu DYNAMIQUE (AC8) : l'état est live et partagé (FR13), pas de prérendu statique.
-// `fetchParticipants()`/`fetchUnavailabilities()` tournent aussi côté serveur (NEXT_PUBLIC_* seulement).
+// Les fetchs tournent aussi côté serveur (NEXT_PUBLIC_* seulement).
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   // SSR de l'état initial → passé au provider client (pas de flash de chargement).
-  // Les deux fetchs en parallèle, INDÉPENDANTS : l'échec de l'un retombe sur [] sans perdre l'autre
+  // Les trois fetchs en parallèle, INDÉPENDANTS : l'échec de l'un retombe sur [] sans perdre les autres
   // (Realtime + re-hydratation AD-6 prennent le relais).
-  const [initial, initialUnavailabilities] = await Promise.all([
+  const [initial, initialUnavailabilities, initialGroupExclusions] = await Promise.all([
     fetchParticipants().catch((): Participant[] => []),
     fetchUnavailabilities().catch((): Unavailability[] => []),
+    fetchGroupExclusions().catch((): GroupExclusion[] => []),
   ])
 
   return (
@@ -32,14 +35,18 @@ export default async function Home() {
       </header>
 
       <main className="container">
-        <ParticipantsStoreProvider initial={initial} initialUnavailabilities={initialUnavailabilities}>
+        <ParticipantsStoreProvider
+          initial={initial}
+          initialUnavailabilities={initialUnavailabilities}
+          initialGroupExclusions={initialGroupExclusions}
+        >
           <ParticipantsCard />
-        </ParticipantsStoreProvider>
 
-        <section className="card" aria-labelledby="card-options">
-          <h2 id="card-options" className="card-title">Options</h2>
-          <p className="card-empty">Réglages du planning à venir.</p>
-        </section>
+          <section className="card" aria-labelledby="card-options">
+            <h2 id="card-options" className="card-title">Options</h2>
+            <GroupExclusionsPanel />
+          </section>
+        </ParticipantsStoreProvider>
 
         <section className="card" aria-labelledby="card-resultat">
           <h2 id="card-resultat" className="card-title">Résultat</h2>

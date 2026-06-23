@@ -22,10 +22,17 @@ import {
   writeUnavailability,
   type Unavailability,
 } from '@/lib/data/unavailabilities'
+import {
+  fetchGroupExclusions,
+  writeGroupExclusion,
+  type GroupExclusion,
+} from '@/lib/data/group-exclusions'
 import { type ChangeEvent } from '@/lib/store/reconcile'
 import { participantsReducer, type StoreParticipant } from '@/lib/store/participants-reducer'
 import { unavailabilitiesReducer, type StoreUnavailability } from '@/lib/store/unavailabilities-reducer'
+import { groupExclusionsReducer, type StoreGroupExclusion } from '@/lib/store/group-exclusions-reducer'
 import { isValidRange, isDuplicateDay, type DayOrRange } from '@/lib/domain/availability'
+import { isValidEveryN, refDateMatchesDayOfWeek } from '@/lib/domain/team-availability'
 import { parseNames } from '@/lib/store/parse-names'
 
 // Store client de l'équipe (Story 1.5 → 2.3). UI → store → lib/data/ (AD-11) : aucun composant ne
@@ -65,6 +72,15 @@ function toServerUnavailability(u: StoreUnavailability): Unavailability {
     updated_at: u.updated_at,
   }
 }
+function toServerGroupExclusion(g: StoreGroupExclusion): GroupExclusion {
+  return {
+    id: g.id,
+    day_of_week: g.day_of_week,
+    every_n: g.every_n,
+    ref_date: g.ref_date,
+    updated_at: g.updated_at,
+  }
+}
 
 // Spécification d'une écriture serveur, TABLE-AGNOSTIQUE (Story 2.3) : porte ses propres thunks.
 // Mise en file (passphrase) ou conservée pour le retry telle quelle ; `submit`/`retry` la rejouent.
@@ -82,6 +98,9 @@ type WriteSpec = {
 // Forme « optionnelle » des inputs d'une indispo, telle que fournie par l'UI.
 type UnavailabilityInput = { kind: 'day' | 'range'; date1: string; date2: string | null }
 
+// Inputs d'une règle d'exclusion de groupe, tels que fournis par l'UI.
+type GroupExclusionInput = { day_of_week: number; every_n: number; ref_date: string }
+
 // ── Contexte exposé ─────────────────────────────────────────────────────────
 type StoreValue = {
   participants: StoreParticipant[]
@@ -94,6 +113,10 @@ type StoreValue = {
   addUnavailability: (participantId: string, input: UnavailabilityInput) => void
   removeUnavailability: (id: string) => void
   retryUnavailability: (id: string) => void
+  groupExclusions: StoreGroupExclusion[]
+  addGroupExclusion: (input: GroupExclusionInput) => void
+  removeGroupExclusion: (id: string) => void
+  retryGroupExclusion: (id: string) => void
   error: string | null
   clearError: () => void
   passphraseNeeded: boolean
@@ -106,10 +129,12 @@ const ParticipantsContext = createContext<StoreValue | null>(null)
 export function ParticipantsStoreProvider({
   initial,
   initialUnavailabilities,
+  initialGroupExclusions,
   children,
 }: {
   initial: Participant[]
   initialUnavailabilities: Unavailability[]
+  initialGroupExclusions: GroupExclusion[]
   children: ReactNode
 }) {
   const [participants, dispatch] = useReducer(participantsReducer, initial as StoreParticipant[])
@@ -117,11 +142,16 @@ export function ParticipantsStoreProvider({
     unavailabilitiesReducer,
     initialUnavailabilities as StoreUnavailability[],
   )
+  const [groupExclusions, dispatchG] = useReducer(
+    groupExclusionsReducer,
+    initialGroupExclusions as StoreGroupExclusion[],
+  )
   const [error, setError] = useState<string | null>(null)
   const [passphraseNeeded, setPassphraseNeeded] = useState(false)
 
   const seqRef = useRef(0) // ids temporaires d'insert participant (`temp:<n>`).
   const useqRef = useRef(0) // ids temporaires d'insert indispo (`utemp:<n>`).
+  const gseqRef = useRef(0) // ids temporaires d'insert exclusion de groupe (`gtemp:<n>`).
   const writeSeqRef = useRef(0) // clés uniques de file passphrase (`w:<n>`).
   // Écritures en attente d'une passphrase (sans passphrase, ou re-prompt après 401) → rejouées après saisie (AC5).
   const pendingWritesRef = useRef<Map<string, WriteSpec>>(new Map())
@@ -130,12 +160,16 @@ export function ParticipantsStoreProvider({
   // Miroirs d'état pour lire un snapshot de ligne hors closure.
   const stateRef = useRef(participants)
   const stateRefU = useRef(unavailabilities)
+  const stateRefG = useRef(groupExclusions)
   useEffect(() => {
     stateRef.current = participants
   }, [participants])
   useEffect(() => {
     stateRefU.current = unavailabilities
   }, [unavailabilities])
+  useEffect(() => {
+    stateRefG.current = groupExclusions
+  }, [groupExclusions])
 
   // Écriture serveur GÉNÉRIQUE et TABLE-AGNOSTIQUE portant la taxonomie d'erreurs AD-17.
   // Le caller a DÉJÀ appliqué l'optimiste et fourni write/onConfirm/rollback (+ thunks optionnels).
@@ -410,6 +444,76 @@ export function ParticipantsStoreProvider({
     [runWrite],
   )
 
+  // ── Exclusions de groupe (Story 3.1) ─────────────────────────────────────────
+  // Ajout (FR6) : validation cliente PURE d'abord (AC1) → si invalide, message FR + AUCUNE écriture.
+  // Sinon optimiste ADD_OPTIMISTIC + insert serveur.
+  const addGroupExclusion = useCallback(
+    (input: GroupExclusionInput) => {
+      const { day_of_week, every_n, ref_date } = input
+      if (!ref_date) {
+        setError('Veuillez saisir une date de référence.')
+        return
+      }
+      if (!isValidEveryN(every_n)) {
+        setError('La fréquence doit être un entier ≥ 1.')
+        return
+      }
+      if (!refDateMatchesDayOfWeek(ref_date, day_of_week)) {
+        setError('La date de référence doit tomber sur le jour de semaine choisi.')
+        return
+      }
+      const tempId = `gtemp:${gseqRef.current++}`
+      const row: GroupExclusion = { id: tempId, day_of_week, every_n, ref_date, updated_at: '' }
+      dispatchG({ type: 'ADD_OPTIMISTIC', tempId, row })
+      void runWrite({
+        write: (pp) => writeGroupExclusion('insert', { data: { day_of_week, every_n, ref_date } }, pp),
+        onPending: () => dispatchG({ type: 'SET_PENDING', id: tempId }),
+        onConfirm: (r) => dispatchG({ type: 'CONFIRM', tempId, row: r as GroupExclusion }),
+        onFailed: () => dispatchG({ type: 'MARK_FAILED', id: tempId }),
+        rollback: () => dispatchG({ type: 'ROLLBACK', tempId }),
+        onConflictRehydrate: async () => {
+          try {
+            dispatchG({ type: 'HYDRATE', rows: await fetchGroupExclusions() })
+          } catch {
+            /* Realtime prendra le relais. */
+          }
+        },
+        retryKey: tempId,
+      })
+    },
+    [runWrite],
+  )
+
+  // Suppression unitaire (✕) : snapshot AVANT REMOVE → restauration si échec (delete idempotent).
+  const removeGroupExclusion = useCallback(
+    (id: string) => {
+      const snapshot = stateRefG.current.find((g) => g.id === id)
+      if (!snapshot) return
+      const restore = toServerGroupExclusion(snapshot)
+      dispatchG({ type: 'REMOVE', id })
+      void runWrite({
+        write: (pp) => writeGroupExclusion('delete', { id }, pp),
+        onConfirm: () => {
+          /* déjà retiré ; l'écho Realtime DELETE est un no-op (AD-15). */
+        },
+        rollback: () => dispatchG({ type: 'RESTORE', row: restore }),
+        deleteIdempotent: true,
+        retryKey: null,
+      })
+    },
+    [runWrite],
+  )
+
+  const retryGroupExclusion = useCallback(
+    (id: string) => {
+      const spec = failedWritesRef.current.get(id)
+      if (!spec) return
+      failedWritesRef.current.delete(id)
+      void runWrite(spec)
+    },
+    [runWrite],
+  )
+
   const submitPassphrase = useCallback(
     (value: string) => {
       const v = value.trim()
@@ -490,6 +594,33 @@ export function ParticipantsStoreProvider({
     }
   }, [])
 
+  // ── 3ᵉ abonnement Realtime : exclusions de groupe (Story 3.1, AD-6) ──────────
+  useEffect(() => {
+    const channel = supabasePublic
+      .channel('group-exclusions-rt')
+      .on<GroupExclusion>(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'group_exclusions' },
+        (payload) => {
+          const event = mapChange<GroupExclusion>(payload)
+          if (event) dispatchG({ type: 'REALTIME', event })
+        },
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          fetchGroupExclusions()
+            .then((rows) => dispatchG({ type: 'HYDRATE', rows }))
+            .catch(() => {
+              /* refetch impossible : un prochain SUBSCRIBED réessaiera. */
+            })
+        }
+      })
+
+    return () => {
+      void supabasePublic.removeChannel(channel)
+    }
+  }, [])
+
   const value: StoreValue = {
     participants,
     addParticipants,
@@ -501,6 +632,10 @@ export function ParticipantsStoreProvider({
     addUnavailability,
     removeUnavailability,
     retryUnavailability,
+    groupExclusions,
+    addGroupExclusion,
+    removeGroupExclusion,
+    retryGroupExclusion,
     error,
     clearError,
     passphraseNeeded,

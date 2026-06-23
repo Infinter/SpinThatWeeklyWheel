@@ -366,6 +366,112 @@ button:disabled:hover { filter: none; box-shadow: none; }
 .indispo-tag button:disabled { opacity: .5; }
 .indispo-empty { font-size: .78em; color: var(--text-muted); font-style: italic; }
 
+/* ── Exclusions de groupe : panneau repliable (Story 3.1, UX-DR4/UX-DR5) ─── */
+.group-excl-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .4em;
+  padding: .3em .5em;
+  margin-bottom: .2em;
+  background: none;
+  box-shadow: none;
+  border-radius: var(--radius-sm);
+}
+.group-excl-toggle:hover { background: var(--primary-light); box-shadow: none; filter: none; }
+.group-excl-toggle-label { font-size: .85em; font-weight: 600; color: var(--primary-dark); }
+.group-excl-toggle-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  padding: 0 .35em;
+  border-radius: 1em;
+  background: var(--primary);
+  color: #fff;
+  font-size: .72em;
+  font-weight: 700;
+  line-height: 1;
+}
+.group-excl-arrow { font-size: .7em; color: var(--primary); transition: transform .18s; }
+.group-excl-arrow.open { transform: rotate(90deg); }
+
+.group-excl-panel {
+  margin-top: .5em;
+  padding: .9em 1.1em;
+  background: var(--primary-light);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+}
+.group-excl-panel-title {
+  font-weight: 700;
+  font-size: .72em;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--primary-dark);
+  margin-bottom: .6em;
+}
+.group-excl-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45em;
+  align-items: center;
+  margin-bottom: .7em;
+}
+.group-excl-form label,
+.group-excl-form-unit { font-size: .8em; color: var(--text-muted); }
+.group-excl-form input[type='date'],
+.group-excl-form input[type='number'],
+.group-excl-form select {
+  padding: .32em .55em;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  font-size: .82em;
+  font-family: inherit;
+  color: var(--text-color);
+  background: var(--card-bg);
+}
+.group-excl-form input[type='number'] { width: 4em; }
+.group-excl-form input:focus-visible,
+.group-excl-form select:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+/* Bouton « Ajouter » compact, plat (sans dégradé). */
+.group-excl-form button {
+  padding: .35em .8em;
+  font-size: .82em;
+  background: var(--primary);
+  box-shadow: none;
+}
+.group-excl-form button:hover { filter: brightness(1.06); box-shadow: none; }
+
+.group-excl-tags { display: flex; flex-wrap: wrap; gap: .4em; }
+.group-excl-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: .3em;
+  background: var(--card-bg);
+  border: 1px solid var(--primary);
+  border-radius: 20px;
+  padding: .22em .65em;
+  font-size: .77em;
+  color: var(--primary-dark);
+  font-weight: 500;
+}
+.group-excl-tag.pending { opacity: .55; }
+.group-excl-tag.failed { outline: 1px solid #dc2626; }
+.group-excl-tag button {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  filter: none;
+  color: var(--primary);
+  font-size: .9em;
+  line-height: 1;
+  border: none;
+}
+.group-excl-tag button:hover { color: #dc2626; background: none; box-shadow: none; filter: none; }
+.group-excl-tag button:disabled { opacity: .5; }
+.group-excl-empty { font-size: .78em; color: var(--text-muted); font-style: italic; }
+
 /* ── Responsive (≤ 520px) ──────────────────────────────────────────────── */
 @media (max-width: 520px) {
   body { padding: 1.2em .8em 3em; }
@@ -387,6 +493,13 @@ button:disabled:hover { filter: none; box-shadow: none; }
   .indispo-form input[type='date'],
   .indispo-form select { width: 100%; }
   .indispo-form button { justify-content: center; }
+  /* Panneau exclusions de groupe : même empilement (UX-DR7). */
+  .group-excl-panel { padding: .7em .6em; }
+  .group-excl-form { flex-direction: column; align-items: stretch; gap: .35em; }
+  .group-excl-form input[type='date'],
+  .group-excl-form input[type='number'],
+  .group-excl-form select { width: 100%; }
+  .group-excl-form button { justify-content: center; }
 }
 
 /* ── Motion ────────────────────────────────────────────────────────────── */

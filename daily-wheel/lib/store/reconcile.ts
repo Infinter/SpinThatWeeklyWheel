@@ -1,5 +1,6 @@
 import type { Participant } from '@/lib/data/participants'
 import type { Unavailability } from '@/lib/data/unavailabilities'
+import type { GroupExclusion } from '@/lib/data/group-exclusions'
 
 // Réducteur de réconciliation PUR (Story 1.5, AC1/AC10 ; généralisé en Story 2.3, AC4).
 // Applique un événement Realtime `postgres_changes` à la copie de travail locale
@@ -64,6 +65,7 @@ export function reconcileById<T extends { id: string; updated_at: string }>(
 // ── Alias typés (non-régression + lisibilité des call-sites) ──────────────────
 export type ParticipantChangeEvent = ChangeEvent<Participant>
 export type UnavailabilityChangeEvent = ChangeEvent<Unavailability>
+export type GroupExclusionChangeEvent = ChangeEvent<GroupExclusion>
 
 // Conserve la signature historique (Story 1.5) : `tests/reconcile.unit.test.ts` reste vert.
 export function reconcileParticipants(
@@ -77,5 +79,12 @@ export function reconcileUnavailabilities(
   state: Unavailability[],
   event: UnavailabilityChangeEvent,
 ): Unavailability[] {
+  return reconcileById(state, event)
+}
+
+export function reconcileGroupExclusions(
+  state: GroupExclusion[],
+  event: GroupExclusionChangeEvent,
+): GroupExclusion[] {
   return reconcileById(state, event)
 }

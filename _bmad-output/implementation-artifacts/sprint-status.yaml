@@ -57,6 +57,9 @@ story_location: _bmad-output/implementation-artifacts
 # 2026-06-22 — Story 2.3 contextée (Amelia/create-story) : backlog → ready-for-dev.
 # 2026-06-23 — Story 2.3 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
 # 2026-06-23 — Story 2.3 implémentée (Amelia/dev-story) : in-progress → review.
+# 2026-06-23 — Story 3.1 contextée (Amelia/create-story) : backlog → ready-for-dev ; epic-3 backlog → in-progress (1ère story).
+# 2026-06-23 — Story 3.1 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
+# 2026-06-23 — Story 3.1 implémentée (Amelia/dev-story) : in-progress → review.
 
 development_status:
   epic-1: in-progress
@@ -71,8 +74,8 @@ development_status:
   2-2-activer-desactiver-renommer-supprimer-participant: review
   2-3-indisponibilites-individuelles-jour-isole-plage: review
   epic-2-retrospective: optional
-  epic-3: backlog
-  3-1-exclusions-de-groupe-recurrentes: backlog
+  epic-3: in-progress
+  3-1-exclusions-de-groupe-recurrentes: review
   3-2-jours-feries: backlog
   3-3-jours-off-equipe: backlog
   epic-3-retrospective: optional
