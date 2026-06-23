@@ -43,6 +43,7 @@
 generated: 2026-06-22
 last_updated: 2026-06-23
 project: SpinThatWeeklyWheel
+# (last_updated reflète la mise à jour Story 5.2 → review)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
@@ -79,6 +80,9 @@ story_location: _bmad-output/implementation-artifacts
 # 2026-06-23 — Story 5.1 contextée (Amelia/create-story) : backlog → ready-for-dev ; epic-5 backlog → in-progress (1ère story).
 # 2026-06-23 — Story 5.1 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
 # 2026-06-23 — Story 5.1 implémentée (Amelia/dev-story) : in-progress → review.
+# 2026-06-23 — Story 5.2 contextée (Amelia/create-story) : backlog → ready-for-dev (epic-5 déjà in-progress ; story 100% domaine + tests, flag archi #1 audité).
+# 2026-06-23 — Story 5.2 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
+# 2026-06-23 — Story 5.2 implémentée (Amelia/dev-story) : in-progress → review (flag archi #1 levé, 7 tests 5.2, parité legacy intacte, 262/262 verts).
 
 development_status:
   epic-1: in-progress
@@ -105,7 +109,7 @@ development_status:
   epic-4-retrospective: optional
   epic-5: in-progress
   5-1-parcours-guide-stepper-protection-annoncee: review
-  5-2-regle-rotation-horizon-etendu: backlog
+  5-2-regle-rotation-horizon-etendu: review
   5-3-timeline-visuelle-grille-multi-lignes-sans-scrollbar: backlog
   5-4-roue-animee-theatre-revelation-resultat-edf: backlog
   5-5-deux-modes-rotation-complete-jour-le-jour: backlog

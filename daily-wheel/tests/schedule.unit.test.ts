@@ -243,3 +243,153 @@ describe('Mécaniques de génération', () => {
     expect(unscheduled).toHaveLength(0)
   })
 })
+
+// ───────────────────────────────────────────────────────────────────────────────────────────
+// STORY 5.2 — HORIZON ÉTENDU & INVARIANT « nb sessions = nb disponibles » (EXPERIENCE.md:46-55).
+// Ces tests VERROUILLENT la règle de rotation déjà implémentée en 4.2 : un jour ouvré par disponible,
+// jours bloqués (week-end/férié/off/tous-indispo) SAUTÉS et JAMAIS comptés, horizon qui déborde
+// sur les semaines suivantes SANS fenêtre fixe de 7 jours (preuve directe du flag archi #1).
+// Ancrage étendu : 06-29 lun, 06-30 mar, 07-01 mer, 07-02 jeu, 07-03 ven, 07-04 sam, 07-05 dim.
+// ───────────────────────────────────────────────────────────────────────────────────────────
+
+describe('5.2 — horizon étendu & invariant nb sessions = nb dispos', () => {
+  // T2 / AC-2, 7a — cas nominal : N actifs tous disponibles → N sessions, chacun EXACTEMENT une fois.
+  it('(a) nb sessions == nb disponibles : 6 actifs tous dispos → 6 sessions, aucun doublon, rien de non-planifié', () => {
+    const actifs: SchedulePerson[] = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) =>
+      person(id, id.toUpperCase()),
+    )
+    const input: ScheduleInput = {
+      participants: actifs,
+      constraints: { skipWeekends: false },
+      startDate: '2026-06-22',
+    }
+    const { planning, unscheduled } = generateSchedule(input, rng1())
+
+    expect(planning).toHaveLength(6) // un jour ouvré par disponible
+    expect(unscheduled).toHaveLength(0)
+    // Chaque actif apparaît EXACTEMENT une fois (rotation one-shot, pas de doublon).
+    const placedIds = planning.map((r) => r.participantId)
+    expect(new Set(placedIds).size).toBe(6)
+    expect(new Set(placedIds)).toEqual(new Set(actifs.map((p) => p.id)))
+  })
+
+  // T2 (variante) — un « inactif » ne consomme PAS de place : il est filtré CÔTÉ STORE, jamais reçu
+  // par le domaine. On modélise donc directement les 6 actifs reçus ; le 7e (inactif) n'existe pas ici.
+  // L'invariant nb=nb porte sur les ACTIFS reçus (la frontière domaine/store, Dev Notes §sémantique).
+  it('(a-bis) un inactif filtré en amont ne consomme pas de place : domaine reçoit 6 actifs → 6 sessions', () => {
+    const actifsRecus: SchedulePerson[] = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) =>
+      person(id, id.toUpperCase()),
+    )
+    // (le participant « inactif » g — désactivé — est exclu par le store et n'apparaît pas ci-dessus)
+    const input: ScheduleInput = {
+      participants: actifsRecus,
+      constraints: { skipWeekends: false },
+      startDate: '2026-06-22',
+    }
+    const { planning, unscheduled } = generateSchedule(input, rng1())
+    expect(planning).toHaveLength(6)
+    expect(unscheduled).toHaveLength(0)
+  })
+
+  // T3 / AC-3, 7b — un férié ET un week-end intercalés ne sont PAS comptés comme slots.
+  it('(b) férié + week-end intercalés sont sautés et jamais comptés : sessions sur les seuls jours ouvrés valides', () => {
+    const actifs: SchedulePerson[] = ['a', 'b', 'c', 'd'].map((id) => person(id, id.toUpperCase()))
+    const input: ScheduleInput = {
+      participants: actifs,
+      constraints: { skipWeekends: true, holidays: [{ date: '2026-06-24' }] }, // mer 24 férié
+      startDate: '2026-06-22',
+    }
+    const { planning, unscheduled } = generateSchedule(input, rng1())
+
+    expect(planning).toHaveLength(4) // total = nb dispos (les jours bloqués n'ont PAS consommé de place)
+    expect(unscheduled).toHaveLength(0)
+    // Dates précises : lun 22, mar 23, (mer 24 férié sauté), jeu 25, ven 26. (sam 27 / dim 28 hors champ)
+    expect(planning.map((r) => r.date)).toEqual([
+      '2026-06-22',
+      '2026-06-23',
+      '2026-06-25',
+      '2026-06-26',
+    ])
+    // Aucune session sur le férié ni sur le week-end.
+    const dates = planning.map((r) => r.date)
+    expect(dates).not.toContain('2026-06-24') // férié
+    expect(dates).not.toContain('2026-06-27') // samedi
+    expect(dates).not.toContain('2026-06-28') // dimanche
+  })
+
+  // T4 / AC-4, 7c — CŒUR DE LA STORY : l'horizon déborde sur ≥ 2 semaines et place TOUT LE MONDE.
+  // Preuve directe du flag archi #1 : aucune coupure à 7 jours / fin de semaine courante.
+  it('(c) débordement multi-semaines : 8 dispos placés au-delà de la semaine 1 (aucune borne à 7 jours)', () => {
+    const actifs: SchedulePerson[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id) =>
+      person(id, id.toUpperCase()),
+    )
+    const input: ScheduleInput = {
+      participants: actifs,
+      constraints: { skipWeekends: true },
+      startDate: '2026-06-22',
+    }
+    const { planning, unscheduled } = generateSchedule(input, rng1())
+
+    expect(planning).toHaveLength(8) // tout le monde placé
+    expect(unscheduled).toHaveLength(0)
+    // Jours ouvrés : lun 22 → ven 26 (5), [we], lun 29, mar 30, mer 07-01 (3) = 8.
+    expect(planning.map((r) => r.date)).toEqual([
+      '2026-06-22',
+      '2026-06-23',
+      '2026-06-24',
+      '2026-06-25',
+      '2026-06-26',
+      '2026-06-29',
+      '2026-06-30',
+      '2026-07-01',
+    ])
+    // La dernière session tombe ≥ 7 jours après startDate (06-22 + 7 = 06-29) → l'horizon a bien débordé.
+    const lastDate = planning[planning.length - 1].date
+    expect(lastDate >= '2026-06-29').toBe(true) // YMD comparé lexicographiquement == chronologiquement
+    expect(lastDate).toBe('2026-07-01')
+  })
+
+  // T4 (variante) — un férié intercalé repousse encore l'horizon : tout le monde reste placé.
+  it('(c-bis) un férié en semaine 1 repousse l’horizon : les 8 dispos restent tous placés', () => {
+    const actifs: SchedulePerson[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id) =>
+      person(id, id.toUpperCase()),
+    )
+    const input: ScheduleInput = {
+      participants: actifs,
+      constraints: { skipWeekends: true, holidays: [{ date: '2026-06-25' }] }, // jeu 25 férié
+      startDate: '2026-06-22',
+    }
+    const { planning, unscheduled } = generateSchedule(input, rng1())
+
+    expect(planning).toHaveLength(8)
+    expect(unscheduled).toHaveLength(0)
+    // lun 22, mar 23, mer 24, (jeu 25 férié), ven 26, [we], lun 29, mar 30, mer 07-01, jeu 07-02.
+    expect(planning.map((r) => r.date)).toEqual([
+      '2026-06-22',
+      '2026-06-23',
+      '2026-06-24',
+      '2026-06-26',
+      '2026-06-29',
+      '2026-06-30',
+      '2026-07-01',
+      '2026-07-02',
+    ])
+    expect(planning[planning.length - 1].date >= '2026-06-29').toBe(true)
+  })
+
+  // T5 / AC-5, 7d — déterminisme à seed donné SUR le scénario multi-semaines T4 (NFR7).
+  it('(d) déterminisme multi-semaines : même seed → planning strictement identique', () => {
+    const actifs: SchedulePerson[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id) =>
+      person(id, id.toUpperCase()),
+    )
+    const input: ScheduleInput = {
+      participants: actifs,
+      constraints: { skipWeekends: true },
+      startDate: '2026-06-22',
+    }
+    const r1 = generateSchedule(input, createRng(2026))
+    const r2 = generateSchedule(input, createRng(2026))
+    expect(r1).toEqual(r2)
+    expect(r1.planning).toHaveLength(8)
+  })
+})

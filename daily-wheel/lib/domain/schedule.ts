@@ -23,6 +23,13 @@ import {
 import { isPersonUnavailable, type DayOrRange } from '@/lib/domain/availability'
 import type { Rng } from '@/lib/domain/rng'
 
+// Flag archi #1 / NFR6 (Story 5.2) : l'horizon est ÉTENDU — la génération avance dans le calendrier
+// (en sautant les jours neutralisés) jusqu'à placer tous les disponibles, SANS fenêtre fixe de 7 jours.
+// La SEULE borne est ce plafond explicite et intentionnel `start + 1 an`, garde anti-boucle-infinie
+// (NFR6), appliqué À L'IDENTIQUE sur les trois sites d'itération calendaire (phase 0, deadline EDF,
+// placement). Valeur strictement inchangée vs 4.2 → parité legacy préservée (NFR9).
+const HORIZON_LIMIT_YEARS = 1
+
 // Un participant ACTIF candidat à la planification (le store ne fournit QUE les actifs, déjà mappés).
 export type SchedulePerson = {
   id: string
@@ -71,7 +78,7 @@ function getLastConsecAvailDay(
   constraints: TeamConstraints,
 ): string | null {
   let d = fromDay
-  const lim = addYears(fromDay, 1)
+  const lim = addYears(fromDay, HORIZON_LIMIT_YEARS)
   let last: string | null = null
   while (d <= lim) {
     if (isTeamNonSessionDay(d, constraints)) {
@@ -102,7 +109,7 @@ export function generateSchedule(input: ScheduleInput, rng: Rng): ScheduleResult
 
   // Phase 0 — avancer jusqu'au premier jour valide (parité legacy L1006-1013). Horizon depuis startDate.
   let start = startDate
-  const lim0 = addYears(startDate, 1)
+  const lim0 = addYears(startDate, HORIZON_LIMIT_YEARS)
   while (start <= lim0) {
     if (isTeamNonSessionDay(start, constraints)) {
       start = addDays(start, 1)
@@ -124,7 +131,7 @@ export function generateSchedule(input: ScheduleInput, rng: Rng): ScheduleResult
   const planning: ScheduleRow[] = []
   const queue = [...order]
   let cur = start
-  const lim = addYears(start, 1)
+  const lim = addYears(start, HORIZON_LIMIT_YEARS)
 
   while (queue.length > 0 && cur <= lim) {
     // 1) Jour neutralisé d'équipe → sauté (pas un trou).
