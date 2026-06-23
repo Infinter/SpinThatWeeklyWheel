@@ -1,0 +1,637 @@
+<title>Daily Wheel — Proposition UX</title>
+<style>
+  :root {
+    --primary: #0078d4;
+    --primary-dark: #005ea2;
+    --primary-light: #e8f4ff;
+    --accent: #38b2ac;
+    --accent-dark: #2c908a;
+    --gold: #f59e0b;
+    --gold-soft: #fef3c7;
+    --background: #eef4fb;
+    --card-bg: #ffffff;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px -12px rgba(15, 23, 42, .18);
+    --radius: 14px;
+    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: var(--font);
+    background:
+      radial-gradient(1200px 500px at 80% -10%, #dcebff33, transparent),
+      radial-gradient(900px 500px at -10% 10%, #d6f3f033, transparent),
+      var(--background);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 920px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  /* ---------- doc framing ---------- */
+  .doc-tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--primary-dark); background: var(--primary-light);
+    border: 1px solid #bfdbfe; padding: 5px 12px; border-radius: 999px;
+  }
+  .doc-title {
+    font-size: clamp(1.9rem, 4vw, 2.7rem); font-weight: 800; letter-spacing: -.02em;
+    margin: 16px 0 6px; line-height: 1.1;
+  }
+  .doc-sub { color: var(--muted); font-size: 1.02rem; max-width: 60ch; margin: 0; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .legend span {
+    font-size: .74rem; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: #fff; color: var(--muted);
+  }
+  .legend b { color: var(--primary); }
+
+  /* ---------- app frame ---------- */
+  .app {
+    margin-top: 30px; background: var(--card-bg);
+    border: 1px solid var(--border); border-radius: 22px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .app-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 22px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #fff, #fbfdff);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -.01em; }
+  .brand .mark {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: conic-gradient(from 210deg, var(--primary), var(--accent), var(--gold), var(--primary));
+    display: grid; place-items: center; color: #fff; font-size: 1rem;
+    box-shadow: inset 0 0 0 2px #ffffff55;
+  }
+  .lock {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
+    font-size: .76rem; color: var(--muted); background: #f8fafc;
+    border: 1px solid var(--border); padding: 6px 11px; border-radius: 999px;
+  }
+  .lock b { color: var(--text); font-weight: 600; }
+
+  /* ---------- stepper (D) ---------- */
+  .stepper { display: flex; gap: 0; padding: 18px 22px 6px; }
+  .step {
+    flex: 1; display: flex; align-items: center; gap: 10px;
+    padding: 6px 4px; position: relative; cursor: pointer; background: none; border: 0;
+    font-family: var(--font); text-align: left; color: var(--muted);
+  }
+  .step:not(:last-child)::after {
+    content: ""; position: absolute; right: 0; top: 50%; width: calc(100% - 56px);
+    height: 2px; background: var(--border); transform: translateX(28px);
+  }
+  .step .num {
+    width: 30px; height: 30px; border-radius: 50%; flex: none;
+    display: grid; place-items: center; font-weight: 700; font-size: .9rem;
+    background: #fff; border: 2px solid var(--border); color: var(--muted); z-index: 1;
+    transition: all .25s;
+  }
+  .step .lbl { font-size: .82rem; line-height: 1.2; }
+  .step .lbl b { display: block; color: var(--text); font-size: .92rem; }
+  .step.done .num { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .step.active .num { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 0 0 4px var(--primary-light); }
+  .step.active .lbl b { color: var(--primary); }
+
+  /* ---------- panels ---------- */
+  .panel { padding: 20px 22px; border-top: 1px solid var(--border); }
+  .panel:first-of-type { border-top: 0; }
+  .panel h2 {
+    font-size: .76rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 14px; font-weight: 700;
+  }
+  .panel .summary-line { color: var(--muted); font-size: .9rem; margin: -8px 0 14px; }
+  .panel .summary-line b { color: var(--primary); font-weight: 700; }
+
+  /* roster chips */
+  .roster { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px 6px 6px; border-radius: 999px;
+    background: #f8fafc; border: 1px solid var(--border); font-size: .9rem; font-weight: 600;
+  }
+  .chip .av {
+    width: 24px; height: 24px; border-radius: 50%; color: #fff; font-size: .72rem; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  .chip.out { opacity: .6; }
+  .chip.out .nm { text-decoration: line-through; text-decoration-color: var(--muted); }
+  .chip .state { font-size: .68rem; font-weight: 700; color: var(--muted); }
+
+  /* ---------- SPIN HERO (A) ---------- */
+  .spin-wrap { display: grid; grid-template-columns: 300px 1fr; gap: 26px; align-items: center; }
+  .wheel-stage { position: relative; width: 280px; height: 280px; margin: 0 auto; }
+  canvas#wheel { display: block; width: 280px; height: 280px; border-radius: 50%;
+    box-shadow: 0 18px 40px -18px rgba(0,120,212,.6), inset 0 0 0 8px #ffffff; }
+  .pointer {
+    position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 13px solid transparent; border-right: 13px solid transparent;
+    border-top: 22px solid var(--gold); filter: drop-shadow(0 3px 3px rgba(0,0,0,.2)); z-index: 3;
+  }
+  .hub {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 64px; height: 64px; border-radius: 50%; background: #fff; z-index: 2;
+    display: grid; place-items: center; font-size: 1.5rem;
+    box-shadow: 0 4px 12px rgba(15,23,42,.18);
+  }
+
+  .spin-side h3 { margin: 0 0 4px; font-size: 1.45rem; letter-spacing: -.02em; }
+  .spin-side p { margin: 0 0 16px; color: var(--muted); font-size: .95rem; }
+
+  .modes { display: inline-flex; background: #f1f5f9; border-radius: 11px; padding: 4px; margin-bottom: 16px; }
+  .modes button {
+    border: 0; background: none; font-family: var(--font); font-weight: 700; font-size: .85rem;
+    color: var(--muted); padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: all .2s;
+  }
+  .modes button.sel { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(15,23,42,.12); }
+
+  .btn {
+    font-family: var(--font); font-weight: 700; font-size: .95rem; cursor: pointer;
+    border-radius: 11px; padding: 12px 22px; border: 1px solid transparent;
+    display: inline-flex; align-items: center; gap: 9px; transition: transform .12s, box-shadow .2s, background .2s;
+  }
+  .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 8px 20px -8px rgba(0,120,212,.7); }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-dark); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+  .btn-ghost { background: #fff; border-color: var(--border); color: var(--text); }
+  .btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .reveal { margin-top: 14px; min-height: 26px; font-size: 1.05rem; color: var(--muted); font-weight: 600; }
+  .reveal b { color: var(--accent-dark); }
+
+  /* ---------- TIMELINE (C) ---------- */
+  .timeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; padding: 2px 0 4px; }
+  .day {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 8px 12px;
+    min-height: 132px; background: #fff; display: flex; flex-direction: column; gap: 6px;
+    text-align: center; transition: box-shadow .3s, transform .3s;
+  }
+  .day .dow { font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .day .dnum { font-size: 1.15rem; font-weight: 800; color: var(--text); line-height: 1; }
+  .day .mon { font-size: .62rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .day .slot { margin-top: auto; }
+  .day .av-lg {
+    width: 40px; height: 40px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 1rem;
+    display: grid; place-items: center; margin: 0 auto 6px;
+    animation: pop .4s cubic-bezier(.2,1.3,.5,1);
+  }
+  .day .who { font-size: .82rem; font-weight: 700; }
+  .day .placeholder { font-size: .72rem; color: #cbd5e1; margin-top: auto; }
+  @keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .day.weekend { background: repeating-linear-gradient(45deg, #f8fafc, #f8fafc 6px, #f1f5f9 6px, #f1f5f9 12px); }
+  .day.blocked { background: var(--gold-soft); border-color: #fcd34d; }
+  .day .badge {
+    font-size: .62rem; font-weight: 700; padding: 2px 6px; border-radius: 6px;
+    background: #fff; border: 1px solid currentColor; color: var(--gold); align-self: center; margin-top: auto;
+  }
+  .day.weekend .badge { color: var(--muted); }
+  .day.skipnote { font-size: .6rem; color: var(--muted); margin-top: 4px; }
+  .day.justpicked { box-shadow: 0 0 0 3px var(--gold); transform: translateY(-3px); }
+
+  .export-row { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .export-row .lead { font-size: .85rem; color: var(--muted); margin-right: 2px; }
+  .mini {
+    font-family: var(--font); font-size: .82rem; font-weight: 600; cursor: pointer;
+    background: #fff; border: 1px solid var(--border); color: var(--text);
+    padding: 7px 13px; border-radius: 9px; display: inline-flex; gap: 6px; align-items: center;
+  }
+  .mini:hover { border-color: var(--primary); color: var(--primary); }
+  .mini.active { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+
+  .export-preview { margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: none; }
+  .export-preview.show { display: block; animation: rise .25s ease; }
+  .ep-head { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #f8fafc; border-bottom: 1px solid var(--border); font-size: .82rem; }
+  .ep-head .fmt { font-weight: 700; }
+  .ep-head .ep-hint { color: var(--muted); }
+  .ep-head .spacer { margin-left: auto; }
+  .ep-x { border: 0; background: none; cursor: pointer; color: var(--muted); font-size: .9rem; line-height: 1; }
+  .ep-x:hover { color: var(--text); }
+  .ep-body { margin: 0; padding: 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .82rem; line-height: 1.65; white-space: pre-wrap; word-break: break-word; color: var(--text); background: #fff; }
+
+  /* ---------- annotations ---------- */
+  .note {
+    margin: 14px 0 0; font-size: .8rem; color: var(--muted);
+    border-left: 3px solid var(--accent); padding: 2px 0 2px 12px;
+  }
+  .note b { color: var(--accent-dark); }
+
+  /* ---------- toast (B) ---------- */
+  .toasts { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .toast {
+    background: var(--text); color: #fff; font-size: .88rem; font-weight: 600;
+    padding: 11px 18px; border-radius: 11px; box-shadow: 0 10px 30px -8px rgba(15,23,42,.5);
+    display: flex; align-items: center; gap: 9px; animation: rise .3s ease;
+  }
+  .toast .ok { color: #6ee7b7; font-weight: 800; }
+  @keyframes rise { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  @media (max-width: 640px) {
+    .spin-wrap { grid-template-columns: 1fr; }
+    .step .lbl span { display: none; }
+    .ep-head .ep-hint { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+</style>
+
+<div class="wrap">
+  <span class="doc-tag">🎨 Proposition UX · Sally</span>
+  <h1 class="doc-title">Daily Wheel, repensée autour du rituel</h1>
+  <p class="doc-sub">Un parcours en trois temps — Équipe, Contraintes, Spin — qui culmine sur le moment qu'on attend vraiment : faire tourner la roue. Prototype cliquable. Tout est interactif.</p>
+  <div class="legend">
+    <span><b>A</b> Le rituel du Spin</span>
+    <span><b>C</b> Timeline visuelle</span>
+    <span><b>D</b> Parcours guidé</span>
+  </div>
+
+  <div class="app">
+    <!-- bar -->
+    <div class="app-bar">
+      <div class="brand"><span class="mark">🎡</span> Daily Wheel</div>
+      <span class="lock">🔒 Équipe protégée · <b>déverrouillée</b></span>
+    </div>
+
+    <!-- stepper (D) -->
+    <div class="stepper">
+      <button class="step done"><span class="num">✓</span><span class="lbl">Étape 1<b>Équipe</b></span></button>
+      <button class="step done"><span class="num">✓</span><span class="lbl">Étape 2<b>Contraintes</b></span></button>
+      <button class="step active"><span class="num">3</span><span class="lbl">Étape 3<b>Spin</b></span></button>
+    </div>
+
+    <!-- team summary (D) -->
+    <div class="panel">
+      <h2>L'équipe</h2>
+      <p class="summary-line">8 personnes · <b>6 disponibles</b> → 6 jours ouvrés à tirer</p>
+      <div class="roster" id="roster"></div>
+      <p class="note"><b>D —</b> les contraintes (week-ends, férié du 25, indispos) sont posées à l'étape 2 et résumées ici. Karim est inactif, Léa absente toute la période : ils sortent de la roue, et le nombre de jours à tirer s'ajuste tout seul.</p>
+    </div>
+
+    <!-- SPIN (A) -->
+    <div class="panel">
+      <h2>La sélection</h2>
+      <div class="spin-wrap">
+        <div class="wheel-stage">
+          <div class="pointer"></div>
+          <canvas id="wheel" width="560" height="560"></canvas>
+          <div class="hub">🎡</div>
+        </div>
+        <div class="spin-side">
+          <h3 id="spinTitle">On fait tourner ?</h3>
+          <p id="spinDesc">On tire autant de jours ouvrés qu'il y a de personnes disponibles : chacune anime une fois. La roue retire chaque nom tiré — plus de doublon, plus d'oubli.</p>
+          <div class="modes" role="tablist" aria-label="Mode de sélection">
+            <button id="modeWeek" class="sel" role="tab" aria-selected="true">Rotation complète</button>
+            <button id="modeDay" role="tab" aria-selected="false">Jour le jour</button>
+          </div>
+          <div class="btn-row">
+            <button id="spinBtn" class="btn btn-primary">🎡 Lancer la rotation</button>
+            <button id="resetBtn" class="btn btn-ghost">Recommencer</button>
+          </div>
+          <div class="reveal" id="reveal" role="status" aria-live="polite">Le suspense fait partie du job.</div>
+        </div>
+      </div>
+      <p class="note"><b>A —</b> le produit s'appelle « Wheel » : le clic produit enfin une <b>vraie roue</b> qui ralentit et s'arrête sur un nom. En mode « jour le jour », chaque matin du standup = un spin, un suspense.</p>
+    </div>
+
+    <!-- TIMELINE (C) -->
+    <div class="panel">
+      <h2>La rotation</h2>
+      <p class="summary-line">6 disponibles → <b>6 jours ouvrés consécutifs</b>, du lun 23 juin au mar 1 juil. Les jours bloqués sont sautés, pas comptés.</p>
+      <div class="timeline" id="timeline"></div>
+      <div class="export-row">
+        <span class="lead">Partager&nbsp;:</span>
+        <button class="mini" data-export="Slack">💬 Pour Slack</button>
+        <button class="mini" data-export="CSV">⬇ En CSV</button>
+        <button class="mini" data-export="Lien">🔗 Lien de partage</button>
+      </div>
+      <div class="export-preview" id="exportPreview">
+        <div class="ep-head">
+          <span class="fmt" id="epLabel">Aperçu</span>
+          <span class="ep-hint">— exactement ce qui est copié</span>
+          <span class="spacer"></span>
+          <button class="mini" id="epCopy">📋 Copier</button>
+          <button class="ep-x" id="epClose" aria-label="Fermer l'aperçu">✕</button>
+        </div>
+        <pre class="ep-body" id="epBody"></pre>
+      </div>
+      <p class="note"><b>C —</b> fini le tableau gris. Une bande de jours qui défile : contraintes en filigrane (week-ends hachurés, jours bloqués en ambre et <b>sautés</b>), animateur révélé sur chaque jour ouvré. Et on peut enfin <b>partager</b> le planning.</p>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var COLORS = ["#0078d4", "#38b2ac", "#7c5cff", "#e8618c", "#f59e0b", "#10b981", "#3b82f6", "#ef4444"];
+
+  // 8-person team. Karim inactive, Léa unavailable the whole period → 6 available.
+  var team = [
+    { name: "Alice", state: "ok" },
+    { name: "Bob",   state: "ok" },
+    { name: "Chloé", state: "ok" },
+    { name: "David", state: "ok" },
+    { name: "Emma",  state: "ok" },
+    { name: "Farah", state: "ok" },
+    { name: "Karim", state: "inactif" },
+    { name: "Léa",   state: "absente" }
+  ];
+  team.forEach(function (p, i) { p.color = COLORS[i % COLORS.length]; p.initials = p.name.slice(0, 1).toUpperCase(); });
+
+  // available = animates this rotation
+  var available = team.filter(function (p) { return p.state === "ok"; });
+
+  // calendar span; working days get filled, blocked days are skipped (not counted)
+  var days = [
+    { dow: "lun", num: 23, mon: "juin", type: "work" },
+    { dow: "mar", num: 24, mon: "juin", type: "work" },
+    { dow: "mer", num: 25, mon: "juin", type: "blocked", label: "Férié" },
+    { dow: "jeu", num: 26, mon: "juin", type: "work" },
+    { dow: "ven", num: 27, mon: "juin", type: "work" },
+    { dow: "sam", num: 28, mon: "juin", type: "weekend", label: "WE" },
+    { dow: "dim", num: 29, mon: "juin", type: "weekend", label: "WE" },
+    { dow: "lun", num: 30, mon: "juin", type: "work" },
+    { dow: "mar", num: 1,  mon: "juil", type: "work" }
+  ];
+  // working day indices, in order — exactly as many as we have available people
+  var workIdx = [];
+  days.forEach(function (d, i) { if (d.type === "work") workIdx.push(i); });
+  workIdx = workIdx.slice(0, available.length); // 6 work days for 6 people
+
+  // ---------- roster ----------
+  var rosterEl = document.getElementById("roster");
+  team.forEach(function (p) {
+    var c = document.createElement("span");
+    c.className = "chip" + (p.state === "ok" ? "" : " out");
+    var state = p.state === "ok" ? "" : '<span class="state">· ' + p.state + '</span>';
+    c.innerHTML = '<span class="av" style="background:' + p.color + '">' + p.initials + '</span>' +
+                  '<span class="nm">' + p.name + '</span>' + state;
+    rosterEl.appendChild(c);
+  });
+
+  // ---------- timeline ----------
+  var tlEl = document.getElementById("timeline");
+  var dayNodes = [];
+  days.forEach(function (d, i) {
+    var el = document.createElement("div");
+    var cls = "day";
+    if (d.type === "weekend") cls += " weekend";
+    if (d.type === "blocked") cls += " blocked";
+    el.className = cls;
+    var head = '<div class="dow">' + d.dow + '</div><div class="dnum">' + d.num + '</div><div class="mon">' + d.mon + '</div>';
+    var body;
+    if (d.type === "work") {
+      body = workIdx.indexOf(i) === -1 ? '<div class="placeholder">hors rotation</div>' : '<div class="slot placeholder">à tirer</div>';
+    } else {
+      body = '<div class="badge">' + d.label + '</div><div class="skipnote">sauté</div>';
+    }
+    el.innerHTML = head + body;
+    tlEl.appendChild(el);
+    dayNodes.push(el);
+  });
+
+  var results = []; // chronological assignments, drives the exports
+
+  function fillDay(dayIndex, person) {
+    var el = dayNodes[dayIndex];
+    var d = days[dayIndex];
+    el.querySelector(".slot").outerHTML =
+      '<div class="slot"><div class="av-lg" style="background:' + person.color + '">' + person.initials + '</div>' +
+      '<div class="who">' + person.name + '</div></div>';
+    el.classList.add("justpicked");
+    results.push({ dow: d.dow, num: d.num, mon: d.mon, name: person.name });
+    setTimeout(function () { el.classList.remove("justpicked"); }, 900);
+  }
+
+  // ---------- toast ----------
+  function toast(msg) {
+    var box = document.getElementById("toasts");
+    var t = document.createElement("div");
+    t.className = "toast";
+    t.innerHTML = '<span class="ok">✓</span>' + msg;
+    box.appendChild(t);
+    setTimeout(function () { t.style.opacity = "0"; t.style.transition = "opacity .3s"; }, 2200);
+    setTimeout(function () { t.remove(); }, 2600);
+  }
+
+  // ---------- wheel ----------
+  var cv = document.getElementById("wheel");
+  var ctx = cv.getContext("2d");
+  var R = 280, CX = 280, CY = 280;
+  var angle = 0;
+  var remaining = available.slice();
+
+  function drawWheel(rot) {
+    ctx.clearRect(0, 0, 560, 560);
+    var n = remaining.length;
+    if (n === 0) {
+      ctx.beginPath(); ctx.arc(CX, CY, R - 8, 0, Math.PI * 2);
+      ctx.fillStyle = "#eef4fb"; ctx.fill();
+      return;
+    }
+    var seg = (Math.PI * 2) / n;
+    for (var i = 0; i < n; i++) {
+      var a0 = rot + i * seg, a1 = a0 + seg;
+      ctx.beginPath();
+      ctx.moveTo(CX, CY);
+      ctx.arc(CX, CY, R - 8, a0, a1);
+      ctx.closePath();
+      ctx.fillStyle = remaining[i].color;
+      ctx.fill();
+      ctx.save();
+      ctx.translate(CX, CY);
+      ctx.rotate(a0 + seg / 2);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#fff";
+      ctx.font = "700 26px 'Segoe UI', sans-serif";
+      ctx.fillText(remaining[i].name, R - 38, 9);
+      ctx.restore();
+    }
+  }
+  drawWheel(0);
+
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function spinTo(targetIdx, cb) {
+    var n = remaining.length, seg = (Math.PI * 2) / n;
+    var desired = -Math.PI / 2 - (targetIdx + 0.5) * seg;
+    var turns = (4 + (workCursor % 3)) * Math.PI * 2;
+    var start = angle;
+    var end = start + turns + (((desired - (start % (Math.PI * 2))) + Math.PI * 4) % (Math.PI * 2));
+    var dur = 2100, t0 = null;
+    function frame(ts) {
+      if (t0 === null) t0 = ts;
+      var p = Math.min(1, (ts - t0) / dur);
+      angle = start + (end - start) * easeOut(p);
+      drawWheel(angle);
+      if (p < 1) requestAnimationFrame(frame);
+      else { angle = end; drawWheel(angle); cb(); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  var revealEl = document.getElementById("reveal");
+  var spinBtn = document.getElementById("spinBtn");
+  var spinning = false, mode = "week", workCursor = 0;
+
+  function doOneSpin(done) {
+    if (workCursor >= workIdx.length || remaining.length === 0) { done && done(true); return; }
+    var dayIndex = workIdx[workCursor];
+    var d = days[dayIndex];
+    var pickIdx = Math.floor(Math.random() * remaining.length);
+    var pick = remaining[pickIdx];
+    revealEl.innerHTML = "🎡 La roue tourne…";
+    spinTo(pickIdx, function () {
+      fillDay(dayIndex, pick);
+      remaining.splice(pickIdx, 1);
+      drawWheel(angle);
+      revealEl.innerHTML = '<b>' + pick.name + '</b> animera le standup du ' + d.dow + ' ' + d.num + ' !';
+      workCursor++;
+      done && done(false);
+    });
+  }
+
+  function runRotation() {
+    spinning = true; spinBtn.disabled = true;
+    (function next() {
+      doOneSpin(function (finished) {
+        if (finished || workCursor >= workIdx.length) {
+          spinning = false; spinBtn.disabled = false;
+          spinBtn.innerHTML = "🎡 Relancer la rotation";
+          toast("Rotation générée — 6 jours attribués");
+          revealEl.innerHTML = "Rotation complète&nbsp;! <b>Chacun anime une fois</b>, du 23 juin au 1ᵉʳ juil.";
+          return;
+        }
+        setTimeout(next, 600);
+      });
+    })();
+  }
+
+  function runDay() {
+    if (spinning) return;
+    if (workCursor >= workIdx.length) {
+      revealEl.innerHTML = "Toute la rotation est attribuée. <b>Recommence pour rejouer.</b>";
+      return;
+    }
+    spinning = true; spinBtn.disabled = true;
+    doOneSpin(function () {
+      spinning = false;
+      if (workCursor >= workIdx.length) {
+        spinBtn.innerHTML = "✓ Rotation complète"; spinBtn.disabled = true;
+        toast("Dernier jour attribué");
+      } else {
+        spinBtn.disabled = false; spinBtn.innerHTML = "🎡 Tirer le jour suivant";
+      }
+    });
+  }
+
+  spinBtn.addEventListener("click", function () {
+    if (mode === "week") { if (workCursor >= workIdx.length) resetAll(); runRotation(); }
+    else runDay();
+  });
+
+  function resetAll() {
+    workCursor = 0; spinning = false; remaining = available.slice(); results = [];
+    workIdx.forEach(function (di) {
+      dayNodes[di].querySelector(".slot").outerHTML = '<div class="slot placeholder">à tirer</div>';
+    });
+    drawWheel(angle);
+    revealEl.innerHTML = "Le suspense fait partie du job.";
+    spinBtn.disabled = false;
+    spinBtn.innerHTML = (mode === "week") ? "🎡 Lancer la rotation" : "🎡 Tirer le premier jour";
+    ep.classList.remove("show");
+    exportBtns.forEach(function (b) { b.classList.remove("active"); });
+  }
+  document.getElementById("resetBtn").addEventListener("click", resetAll);
+
+  var mWeek = document.getElementById("modeWeek"), mDay = document.getElementById("modeDay");
+  var sTitle = document.getElementById("spinTitle"), sDesc = document.getElementById("spinDesc");
+  function setMode(m) {
+    mode = m;
+    mWeek.classList.toggle("sel", m === "week");
+    mDay.classList.toggle("sel", m === "day");
+    mWeek.setAttribute("aria-selected", m === "week");
+    mDay.setAttribute("aria-selected", m === "day");
+    resetAll();
+    if (m === "week") {
+      sTitle.textContent = "On fait tourner ?";
+      sDesc.textContent = "On tire autant de jours ouvrés qu'il y a de personnes disponibles : chacune anime une fois. La roue retire chaque nom tiré — plus de doublon, plus d'oubli.";
+      spinBtn.innerHTML = "🎡 Lancer la rotation";
+    } else {
+      sTitle.textContent = "Un jour, un suspense";
+      sDesc.textContent = "Chaque matin au standup, un clic révèle l'animateur du jour parmi les personnes pas encore tirées. Le rituel quotidien que l'équipe attend.";
+      spinBtn.innerHTML = "🎡 Tirer le premier jour";
+    }
+  }
+  mWeek.addEventListener("click", function () { setMode("week"); });
+  mDay.addEventListener("click", function () { setMode("day"); });
+
+  // ---------- exports (B) ----------
+  var ep = document.getElementById("exportPreview");
+  var epLabel = document.getElementById("epLabel");
+  var epBody = document.getElementById("epBody");
+  var exportBtns = Array.prototype.slice.call(document.querySelectorAll("[data-export]"));
+  var MON = { juin: "06", juil: "07" };
+
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+
+  function buildSlack() {
+    var head = "🎡 *Rotation Daily Scrum* — semaine du 23 juin 2026\n" +
+               "_Chacun anime une fois ; jours fériés et week-ends sautés._\n\n";
+    return head + results.map(function (r) {
+      return "• " + r.dow + " " + r.num + " " + r.mon + "  →  *" + r.name + "*";
+    }).join("\n");
+  }
+  function buildCSV() {
+    var rows = ["Date,Jour,Animateur"];
+    results.forEach(function (r) {
+      rows.push("2026-" + MON[r.mon] + "-" + pad2(r.num) + "," + r.dow + "," + r.name);
+    });
+    return rows.join("\n");
+  }
+  function buildLink() {
+    return "https://daily-wheel.app/scrum-team/rotation/23-06-2026\n\n" +
+           "Lien public en lecture seule — chaque personne y voit son jour.\n" +
+           "Aucune modification possible sans la phrase de passe de l'équipe.";
+  }
+
+  function showExport(kind) {
+    if (!results.length) { toast("Lance d'abord la rotation"); return; }
+    var content, label;
+    if (kind === "Slack") { content = buildSlack(); label = "Message Slack"; }
+    else if (kind === "CSV") { content = buildCSV(); label = "Fichier rotation.csv"; }
+    else { content = buildLink(); label = "Lien de partage"; }
+    epLabel.textContent = label;
+    epBody.textContent = content;
+    ep.classList.add("show");
+    exportBtns.forEach(function (b) { b.classList.toggle("active", b.getAttribute("data-export") === kind); });
+  }
+
+  exportBtns.forEach(function (b) {
+    b.addEventListener("click", function () { showExport(b.getAttribute("data-export")); });
+  });
+
+  document.getElementById("epCopy").addEventListener("click", function () {
+    try { if (navigator.clipboard) navigator.clipboard.writeText(epBody.textContent); } catch (e) {}
+    toast("Copié dans le presse-papier");
+  });
+  document.getElementById("epClose").addEventListener("click", function () {
+    ep.classList.remove("show");
+    exportBtns.forEach(function (b) { b.classList.remove("active"); });
+  });
+})();
+</script>

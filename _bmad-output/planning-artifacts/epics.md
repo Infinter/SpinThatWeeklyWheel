@@ -3,6 +3,8 @@ stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step
 inputDocuments:
   - docs/prd.md
   - _bmad-output/planning-artifacts/architecture/architecture-SpinThatWeeklyWheel-2026-06-22/ARCHITECTURE-SPINE.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-SpinThatWeeklyWheel-2026-06-23/DESIGN.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-SpinThatWeeklyWheel-2026-06-23/EXPERIENCE.md
 ---
 
 # Daily Wheel - Epic Breakdown
@@ -29,6 +31,10 @@ Ce document fournit le découpage complet en epics et stories pour **Daily Wheel
 - **FR12 :** L'application affiche le planning généré (date longue FR → animateur) ainsi que la liste des participants non planifiés.
 - **FR13 :** Toutes les données sont persistées dans Supabase et partagées : tout client qui ouvre l'URL voit le même état.
 - **FR14 :** Le tirage de base reste aléatoire (l'ordre initial change à chaque lancement), l'EDF servant uniquement à départager selon les fenêtres de disponibilité.
+- **FR15 :** *(Redesign — Epic 5)* La rotation produit autant de sessions qu'il y a de participants **disponibles** (actifs ET non indisponibles sur la période) : chacun anime exactement une fois. Les jours bloqués (week-end, exclusion de groupe, férié, jour off) sont **sautés et non comptés** comme slot ; l'horizon s'étend sur les semaines suivantes jusqu'à placer tous les disponibles.
+- **FR16 :** *(Redesign — Epic 5)* Le tirage est révélé via une **roue animée** qui matérialise le résultat EDF pré-calculé (elle ne tire pas indépendamment), selon deux modes : « Rotation complète » (révèle tous les jours d'affilée) et « Jour le jour » (révèle un jour par interaction) ; chaque personne tirée est **retirée** de la roue.
+- **FR17 :** *(Redesign — Epic 5)* L'utilisateur peut exporter le planning au format **Message Slack** (markdown) et **CSV** (dates ISO), avec un **aperçu du contenu exact** avant copie. (Lien public et `.ics` hors périmètre.)
+- **FR18 :** *(Redesign — Epic 5)* Le planning généré **persiste** (graine + curseur de progression) afin que le mode « Jour le jour » reprenne au bon endroit après rechargement ou changement de poste.
 
 ### NonFunctional Requirements
 
@@ -64,7 +70,7 @@ Ce document fournit le découpage complet en epics et stories pour **Daily Wheel
 
 ### UX Design Requirements
 
-*Aucun document UX dédié (bmad-ux ou legacy) n'existe dans les artefacts de planification.* Les exigences d'interface proviennent du PRD §3 et sont intégrées aux acceptance criteria des stories concernées :
+**Epics 1–4 (UI d'origine).** À leur création, aucun document UX dédié n'existait ; les exigences d'interface provenaient du PRD §3 (UX-DR1–7 ci-dessous) :
 
 - **UX-DR1 :** Écran principal unique organisé en cartes (Participants, Options, Résultat) ; action principale claire « 🎲 Lancer la sélection ».
 - **UX-DR2 :** Charte visuelle reprise de l'existant — primaire `#0078d4`, fond clair `#eef4fb`, cartes blanches, coins arrondis, icône 🎲, **sans dégradés**.
@@ -73,6 +79,16 @@ Ce document fournit le découpage complet en epics et stories pour **Daily Wheel
 - **UX-DR5 :** Retour visuel via badges (nombre d'indispos, nombre de règles) et messages d'avertissement sur les non-planifiés.
 - **UX-DR6 :** Accessibilité cible WCAG AA raisonnable (contrastes, focus visibles, navigation clavier). *(À confirmer avec l'UX Expert — non spécifié en détail.)*
 - **UX-DR7 :** Responsive desktop-first, mobile pleinement supporté (≤ 520 px).
+
+**Epic 5 (redesign rituel).** Source autoritaire : la spec UX bmad-ux `ux-SpinThatWeeklyWheel-2026-06-23` (`DESIGN.md` + `EXPERIENCE.md` + `mockups/spin-rotation.html`). C'est une **évolution** de l'UI existante (ADN visuel conservé), pas une réécriture :
+
+- **UX-DR8 :** Parcours guidé en **stepper 3 étapes collant** (Équipe → Contraintes → Spin), non bloquant — pas un wizard, retour à toute étape en un clic ; **bandeau « 🔒 Équipe protégée »** annoncé en amont (la saisie de passphrase reste paresseuse, au premier write).
+- **UX-DR9 :** **Roue animée `<canvas>`** — segments par participant (couleur stable partagée avec les avatars), pointeur or à 12h, moyeu central 🎡 ; ralentissement ease-out vers l'animateur assigné ; **retrait du segment tiré** à chaque tour.
+- **UX-DR10 :** **Timeline en grille multi-lignes, sans scrollbar horizontale** : week-ends hachurés, jours bloqués en ambre marqués « sauté », animateur révélé par jour ouvré (avatar couleur + prénom).
+- **UX-DR11 :** **Panneau d'aperçu d'export** affichant le contenu exact (monospace) avant copie ; export désactivé tant qu'aucune rotation n'est tirée.
+- **UX-DR12 :** **Microcopie & branding** : CTA « **Lancer la roue** » (remplace « Lancer la sélection »), mark applicatif **🎡** (remplace 🎲), tutoiement sobre-joueur, vocabulaire produit (animateur, tirage, jours fériés/off, indisponibilités, exclusions de groupe).
+- **UX-DR13 :** **Mouvement & accessibilité** : `prefers-reduced-motion` respecté (roue → résultat direct, sans rotation) ; résultat de la roue annoncé en **région live `role="status"`** (canvas `aria-hidden`) ; **couleur jamais seule** porteuse de sens (badge texte : « WE », « Férié », « sauté », état participant).
+- **UX-DR14 :** **Navigation & édition rapide entre étapes** : stepper collant (retour en 1 clic) ; **édition d'indispos en popover** depuis un chip participant (y compris à l'étape Spin), sans quitter la page ni perdre le tirage ; **nudge non destructif** « Contraintes mises à jour — relancer la roue ? » au lieu d'une réinitialisation silencieuse (l'ancien planning reste affiché jusqu'à la relance).
 
 ### FR Coverage Map
 
@@ -90,8 +106,12 @@ Ce document fournit le découpage complet en epics et stories pour **Daily Wheel
 - **FR12 :** Epic 4 — Affichage du planning + non-planifiés.
 - **FR13 :** Epic 1 — Persistance partagée Supabase (établie par la tranche verticale participants), réutilisée et étendue par Epics 2-4.
 - **FR14 :** Epic 4 — Tirage aléatoire initial, EDF en départage.
+- **FR15 :** Epic 5 — Règle de rotation à horizon étendu (1 jour ouvré par disponible).
+- **FR16 :** Epic 5 — Roue de révélation du résultat EDF + deux modes.
+- **FR17 :** Epic 5 — Exports Slack + CSV avec aperçu.
+- **FR18 :** Epic 5 — Persistance de la rotation (mode Jour le jour).
 
-> Toutes les FRs (FR1-FR14) sont couvertes. Les NFRs sont transverses : NFR1/NFR2/NFR3/NFR8 établies en Epic 1 (fondations, sécurité, déploiement) et respectées par toutes les écritures suivantes ; NFR4/NFR5 (français, responsive) appliquées à chaque story d'UI ; NFR6 (performance) et NFR7/NFR9 (déterminisme, parité) vérifiées en Epic 4.
+> FR1-FR14 couvertes par Epics 1-4 (livrés). FR15-FR18 couvertes par Epic 5 (redesign rituel), qui revisite aussi la restitution de FR11/FR12 (génération/affichage) côté UX. Les NFRs sont transverses : NFR1/NFR2/NFR3/NFR8 établies en Epic 1 et respectées par toutes les écritures ; NFR4/NFR5 (français, responsive) appliquées à chaque story d'UI, y compris Epic 5 ; NFR6 (performance) et NFR7/NFR9 (déterminisme, parité) vérifiées en Epic 4 et préservées par Epic 5 (la roue ne change pas le résultat de `generateSchedule`, elle le révèle).
 
 ## Epic List
 
@@ -114,6 +134,11 @@ Offrir les contraintes communes à toute l'équipe : migration des exclusions de
 Reproduire et fiabiliser l'algorithme EDF en intégrant l'ensemble des contraintes, gérer les options (week-ends, date de début) et afficher le résultat (planning + non-planifiés). À l'issue, l'application livre la valeur cœur : un animateur équitable par jour ouvré valide, avec parité prouvée vs l'ancienne page.
 **FRs couvertes :** FR9, FR10, FR11, FR12, FR14.
 **NFRs/AD :** NFR6, NFR7, NFR9 ; AD-1, AD-2, AD-3, AD-12, conventions (settings singleton).
+
+### Epic 5: Redesign UX — rituel de la roue
+Transformer l'expérience de tirage en un **rituel** : parcours guidé (stepper Équipe→Contraintes→Spin), **roue animée** qui révèle le résultat EDF jour par jour (modes Rotation complète / Jour le jour), **timeline visuelle** en remplacement du tableau, et **exports** Slack + CSV. La règle de rotation est précisée (1 jour ouvré par disponible, horizon étendu, jours bloqués sautés). C'est une **évolution** de l'app existante : le domaine `generateSchedule` reste la source de vérité, la roue n'en est que la mise en scène. À l'issue, désigner l'animateur devient un moment attendu, perçu comme équitable parce que mécanique.
+**FRs couvertes :** FR15, FR16, FR17, FR18 (+ revisite UX de FR11/FR12).
+**NFRs/AD :** NFR4, NFR5, NFR7 ; AD-1, AD-2, AD-3 (prédicat unique réutilisé), AD-5 (optimiste). Source : spec UX `ux-SpinThatWeeklyWheel-2026-06-23`.
 
 ---
 
@@ -365,3 +390,164 @@ So that je comprends le résultat et les éventuels écarts (FR12).
 **And** un avertissement liste les participants **non planifiés** avec la raison générique (indisponible / placerait un trou) — UX-DR5
 **And** un message explicite s'affiche si aucun participant n'est planifiable
 **And** la zone Résultat reste responsive et lisible sur mobile (≤ 520 px) — NFR5, UX-DR7.
+
+---
+
+## Epic 5: Redesign UX — rituel de la roue
+
+**Goal :** Transformer le tirage en rituel attendu sans réécrire l'app : parcours guidé, roue animée qui **révèle** (et non re-tire) le résultat EDF, timeline visuelle, exports. Source autoritaire : la spec UX `ux-SpinThatWeeklyWheel-2026-06-23` (`DESIGN.md` + `EXPERIENCE.md` + `mockups/spin-rotation.html`). **Principe directeur :** `generateSchedule` reste la source de vérité du planning ; la roue n'en est que la mise en scène (les deux doivent toujours coïncider).
+
+### Story 5.1: Parcours guidé (stepper) et protection annoncée
+
+As a utilisateur,
+I want une page organisée en trois étapes claires (Équipe → Contraintes → Spin) et savoir d'emblée que l'équipe est protégée,
+So that je sais où je suis dans le réglage et je ne suis pas surpris par la demande de passphrase (UX-DR8).
+
+**Acceptance Criteria:**
+
+**Given** la page principale
+**When** elle se charge
+**Then** un **stepper** affiche trois étapes — `1 Équipe` · `2 Contraintes` · `3 Spin` — avec l'état visuel à faire / complétée (`{colors.accent}` + ✓) / active (`{colors.primary}` + halo)
+**And** le stepper est **collant** (`position: sticky`, reste fixé en haut au défilement) : un clic sur une étape — depuis n'importe quel endroit de la page — fait défiler en douceur vers la surface correspondante
+**And** la navigation est **non bloquante** (pas un wizard) : aucune étape n'est verrouillée, toutes les surfaces restent accessibles à tout moment
+**And** l'étape `1 Équipe` est marquée complétée dès qu'il existe au moins un participant actif ; `3 Spin` dès qu'une rotation a été lancée
+**And** un **bandeau « 🔒 Équipe protégée »** est visible dans la barre supérieure dès le chargement, indiquant l'état déverrouillée/verrouillée — UX-DR8
+**And** la saisie effective de la passphrase reste **paresseuse** (déclenchée au premier write, via le `.passphrase-prompt` existant, mémorisée en `sessionStorage`) — comportement hérité inchangé
+**And** la mise en page reste responsive (≤ 520 px) : le stepper reste lisible (libellés condensés) — NFR5, UX-DR13.
+
+### Story 5.2: Règle de rotation à horizon étendu (domaine)
+
+As a utilisateur,
+I want que la génération produise exactement un jour ouvré par personne disponible, en débordant sur les semaines suivantes si besoin,
+So that chaque membre dispo anime une fois, sans que les jours bloqués ne « consomment » une place (FR15).
+
+**Acceptance Criteria:**
+
+**Given** la fonction pure `generateSchedule(input, rng)` dans `lib/domain/` (aucun import React/DOM/Supabase — AD-1)
+**When** la rotation est calculée
+**Then** le nombre de sessions produites égale le nombre de **disponibles** (participants `actifs` ET non couverts par une indisponibilité sur leur fenêtre) — chacun apparaît **exactement une fois**
+**And** un jour n'est un slot que si `isTeamNonSessionDay` est faux ; les jours bloqués (week-end si option, exclusion de groupe, férié, jour off, ou tous actifs indispo) sont **sautés et non comptés** — via l'unique prédicat (AD-3)
+**And** l'**horizon s'étend** au-delà de la semaine courante : la génération continue d'avancer dans le calendrier jusqu'à avoir placé tous les disponibles ; **toute borne d'horizon implicite qui couperait ce parcours est identifiée et levée** (flag archi #1)
+**And** l'affectation EDF et l'ordre aléatoire initial (FR14) sont préservés : la roue ne change pas le résultat
+**And** un participant ne reste non planifié que s'il ne tient **aucun** slot de l'horizon (cas rare) — l'avertissement existant (Story 4.3) demeure
+**And** des **tests** couvrent : nb sessions = nb dispos ; un férié/week-end intercalé n'est pas compté ; un horizon qui déborde sur N semaines place bien tout le monde ; déterminisme à seed donné (NFR7)
+**And** la performance reste quasi instantanée (≤ 50 participants, horizon ≤ 1 an — NFR6).
+
+### Story 5.3: Timeline visuelle (grille multi-lignes, sans scrollbar)
+
+As a utilisateur,
+I want voir la rotation sous forme de bande de jours visuelle plutôt qu'un tableau,
+So that je comprends le planning et ses contraintes d'un coup d'œil (FR12 revisité, UX-DR10).
+
+**Acceptance Criteria:**
+
+**Given** un planning généré (Story 5.2)
+**When** la timeline s'affiche
+**Then** elle est rendue en **grille `repeat(auto-fit, minmax(96px, 1fr))`** qui **s'enroule sur plusieurs lignes, sans scrollbar horizontale** — UX-DR10
+**And** chaque cellule jour montre jour abrégé + numéro + mois ; les **week-ends** sont hachurés (filigrane), les **jours bloqués** (férié/off) sont en `{colors.gold-soft}` avec badge libellé + mention « **sauté** »
+**And** chaque jour ouvré attribué affiche l'**animateur** (avatar initiale de couleur stable `{colors.wheel-segments}` + prénom)
+**And** la couleur d'un participant est **identique** sur la timeline et sur la roue (attribution par index stable)
+**And** la couleur n'est jamais le seul signal (badges texte) — UX-DR13
+**And** la timeline reste lisible sur mobile (≤ 520 px) : la grille reflue, toujours sans scrollbar — NFR5.
+
+### Story 5.4: Roue animée — théâtre de révélation du résultat EDF
+
+As a utilisateur,
+I want faire tourner une vraie roue qui s'arrête sur l'animateur du jour,
+So that la désignation devient un moment de suspense partagé (FR16, UX-DR9, axe A).
+
+**Acceptance Criteria:**
+
+**Given** un planning calculé par `generateSchedule` (Story 5.2) et la timeline (Story 5.3)
+**When** je lance le tirage
+**Then** une **roue `<canvas>`** affiche un segment par participant disponible (couleur stable, nom lisible), un **pointeur or** fixe à 12h et un moyeu central 🎡 — UX-DR9
+**And** au spin, la roue **ralentit en ease-out (~2 s) et s'arrête sur l'animateur que l'EDF a assigné** au jour courant — **elle ne tire pas indépendamment** (animation et planning coïncident toujours)
+**And** la personne révélée est **retirée** de la roue (le tour suivant ne contient que les restants), garantissant « chacun une fois »
+**And** la cellule de jour correspondante se remplit (animation `pop`) et la révélation est annoncée en **région live `role="status"`** (« {prénom} animera le standup du {jour} {date} ») — le canvas est `aria-hidden` — UX-DR13
+**And** sous `prefers-reduced-motion`, la roue **saute directement au résultat** sans rotation, et la cellule se remplit sans animation — UX-DR13
+**And** la roue est actionnable au clavier (focus + Entrée/Espace) ; CTA désactivé pendant l'animation (`aria-busy`).
+
+### Story 5.5: Deux modes — Rotation complète / Jour le jour
+
+As a utilisateur,
+I want choisir entre tout révéler d'un coup ou un jour à la fois,
+So that j'adapte le rituel : planning de la semaine vs suspense quotidien au standup (FR16, axe A).
+
+**Acceptance Criteria:**
+
+**Given** la section Spin avec un sélecteur de mode (`role="tablist"`)
+**When** je choisis **« Rotation complète »** et lance la roue
+**Then** la roue enchaîne les révélations jour par jour (~0,6 s entre chaque) et remplit toute la timeline, jusqu'au message de fin « Rotation complète ! Chacun anime une fois »
+**And** quand je choisis **« Jour le jour »**, chaque clic révèle **un seul** jour (le suivant dans l'ordre chronologique des slots), le CTA passant de « Tirer le premier jour » → « Tirer le jour suivant » → « ✓ Rotation complète »
+**And** changer de mode réinitialise proprement la rotation en cours (roue et timeline remises à l'état initial)
+**And** les libellés suivent la microcopie figée (Story 5.8) ; le résultat de chaque jour reste annoncé en région live.
+
+### Story 5.6: Persistance de la rotation (mode Jour le jour)
+
+As a membre de l'équipe,
+I want que la rotation reprenne au bon jour après un rechargement ou depuis un autre poste,
+So that le rituel quotidien « Jour le jour » survive entre les standups (FR18, flag archi #2).
+
+**Acceptance Criteria:**
+
+**Given** une rotation entamée en mode « Jour le jour »
+**When** je recharge la page ou l'ouvre depuis un autre navigateur
+**Then** la rotation reprend au **même curseur** (mêmes jours déjà révélés, mêmes animateurs), sans re-tirer
+**And** la persistance s'appuie sur une **graine + un curseur de progression** stockés (et non sur un résultat figé non reproductible), conformément au déterminisme `generateSchedule` (NFR7) — le `schedule` aujourd'hui éphémère dans le store devient persistant
+**And** le mécanisme respecte le contrat d'écriture serveur existant (proxy gardé par passphrase, AD-14) si la graine/curseur sont persistés en base, **ou** est documenté comme état local si la décision d'archi le préfère — la décision est tranchée et tracée
+**And** réinitialiser/relancer la rotation réinitialise graine et curseur
+**And** un test prouve que (graine + curseur) rejoués reproduisent exactement la même rotation.
+
+> ⚠ Cette story porte une **décision d'architecture** (où et comment persister la rotation). À valider avec l'architecte (`bmad-architecture`) avant implémentation.
+
+### Story 5.7: Exports Slack + CSV avec aperçu
+
+As a utilisateur,
+I want exporter le planning en message Slack ou en CSV, en voyant exactement ce qui sera copié,
+So that je partage la rotation à l'équipe sans surprise (FR17, UX-DR11).
+
+**Acceptance Criteria:**
+
+**Given** un planning généré
+**When** je clique un format d'export
+**Then** un **panneau d'aperçu** affiche en monospace le **contenu exact** qui sera copié — UX-DR11
+**And** le **Message Slack** est un markdown formaté (titre + une ligne `• {jour} {date} → *{animateur}*` par session)
+**And** le **CSV** comporte un en-tête et des **dates ISO `YYYY-MM-DD`** (cohérent avec la convention de dates locales du domaine), une ligne par session
+**And** un bouton « Copier » copie le contenu (avec repli silencieux si le presse-papier est indisponible) et confirme par un toast « Copié dans le presse-papier »
+**And** tout export est **désactivé** tant qu'aucune rotation n'est tirée (message « Lance d'abord la rotation »)
+**And** le **lien public** et le **calendrier `.ics`** sont **hors périmètre** de cette story (différés).
+
+### Story 5.8: Microcopie, branding et accessibilité du mouvement
+
+As a utilisateur,
+I want une interface cohérente, joueuse mais sobre, et respectueuse de mes préférences de mouvement,
+So that le redesign est fini et confortable pour tous (UX-DR12, UX-DR13).
+
+**Acceptance Criteria:**
+
+**Given** l'ensemble du redesign
+**When** je parcours l'application
+**Then** le CTA principal de tirage affiche « **Lancer la roue** » (remplace « Lancer la sélection ») et le mark applicatif est **🎡** (favicon + header, remplace 🎲) — UX-DR12
+**And** la microcopie suit le tutoiement sobre-joueur et le **vocabulaire produit** (animateur, tirage/planning, jours fériés, jours off d'équipe, indisponibilités, exclusions de groupe)
+**And** une action garde son nom dans tout le flux (bouton « Copier » → toast « Copié ») ; les empty states sont des invitations à agir
+**And** `prefers-reduced-motion` est respecté partout (roue, `pop`, halos désactivés) — UX-DR13
+**And** la couleur n'est jamais le seul signal ; focus visibles (`outline 2px {colors.primary}`) et navigation clavier conservés (hérités)
+**And** aucune régression visuelle de l'ADN existant (bleu `#0078d4`, teal, Segoe UI, cartes blanches) — c'est une évolution, pas une réécriture.
+
+### Story 5.9: Navigation et édition rapide entre étapes
+
+As a utilisateur,
+I want pouvoir ajuster une contrainte (ajouter une indispo, par ex.) sans quitter le tirage ni tout réinitialiser,
+So that le geste rapide récurrent reste fluide malgré le parcours en étapes (UX-DR14).
+
+**Acceptance Criteria:**
+
+**Given** une rotation affichée à l'étape Spin
+**When** je clique sur un **chip participant** (y compris dans le résumé d'équipe visible à l'étape Spin)
+**Then** l'**éditeur d'indisponibilités** du participant s'ouvre en **popover** par-dessus la page (le même éditeur jour/plage qu'à l'étape Équipe — FR5), sans défilement ni perte de l'état du tirage
+**And** je peux ajouter/supprimer une indispo dans le popover ; la modification est persistée via le contrat d'écriture serveur existant (AD-14), optimiste (AD-5)
+**And** le popover se ferme par `Échap`, clic extérieur ou bouton de fermeture
+**And** dès qu'une **contrainte change** alors qu'un planning est affiché (indispo, férié, jour off, exclusion, toggle actif, option), un **nudge non destructif** « Contraintes mises à jour — relancer la roue ? » apparaît avec une action **Relancer**
+**And** tant que je n'ai pas cliqué **Relancer**, l'**ancien planning reste affiché** (aucune réinitialisation silencieuse) ; cliquer **Relancer** recalcule la rotation avec les nouvelles contraintes
+**And** le popover et le nudge sont accessibles : focus géré à l'ouverture/fermeture, actionnables au clavier, `role` appropriés, et `prefers-reduced-motion` respecté (UX-DR13)
+**And** sur mobile (≤ 520 px), le popover s'affiche en pleine largeur en bas d'écran et reste utilisable (NFR5).
