@@ -90,15 +90,10 @@ describe('isTeamNonSessionDay (AD-3 — source unique ; 3.1 = branche exclusions
     expect(isTeamNonSessionDay('2026-06-23', {})).toBe(false)
   })
 
-  it('teamOffDays / skipWeekends fournis n’ont AUCUN effet (branches 3.3/4.1 non câblées)', () => {
-    // 2026-06-27 est un samedi ; un jour off est fourni sur 2026-06-23 — aucune branche ne le neutralise.
-    // (La branche holidays est câblée depuis 3.2 et couverte par holidays.unit.test.ts.)
-    expect(
-      isTeamNonSessionDay('2026-06-27', {
-        skipWeekends: true,
-        teamOffDays: [{ kind: 'day', date1: '2026-06-23', date2: null }],
-      }),
-    ).toBe(false)
+  it('skipWeekends fourni n’a AUCUN effet (branche 4.1 non câblée)', () => {
+    // 2026-06-27 est un samedi ; skipWeekends est la SEULE branche encore non câblée → aucune neutralisation.
+    // (Les branches holidays/teamOffDays sont câblées depuis 3.2/3.3 et couvertes par leurs tests dédiés.)
+    expect(isTeamNonSessionDay('2026-06-27', { skipWeekends: true })).toBe(false)
   })
 })
 

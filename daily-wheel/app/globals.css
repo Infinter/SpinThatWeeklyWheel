@@ -575,6 +575,111 @@ button:disabled:hover { filter: none; box-shadow: none; }
 .holidays-tag button:disabled { opacity: .5; }
 .holidays-empty { font-size: .78em; color: var(--text-muted); font-style: italic; }
 
+/* ── Jours off d'équipe : panneau repliable (Story 3.3, UX-DR4/UX-DR5) ───── */
+.team-off-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .4em;
+  padding: .3em .5em;
+  margin-bottom: .2em;
+  background: none;
+  box-shadow: none;
+  border-radius: var(--radius-sm);
+}
+.team-off-toggle:hover { background: var(--primary-light); box-shadow: none; filter: none; }
+.team-off-toggle-label { font-size: .85em; font-weight: 600; color: var(--primary-dark); }
+.team-off-toggle-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  padding: 0 .35em;
+  border-radius: 1em;
+  background: var(--primary);
+  color: #fff;
+  font-size: .72em;
+  font-weight: 700;
+  line-height: 1;
+}
+.team-off-arrow { font-size: .7em; color: var(--primary); transition: transform .18s; }
+.team-off-arrow.open { transform: rotate(90deg); }
+
+.team-off-panel {
+  margin-top: .5em;
+  padding: .9em 1.1em;
+  background: var(--primary-light);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+}
+.team-off-panel-title {
+  font-weight: 700;
+  font-size: .72em;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--primary-dark);
+  margin-bottom: .6em;
+}
+.team-off-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45em;
+  align-items: center;
+  margin-bottom: .7em;
+}
+.team-off-form label { font-size: .8em; color: var(--text-muted); }
+.team-off-form input[type='date'],
+.team-off-form input[type='text'],
+.team-off-form select {
+  padding: .32em .55em;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  font-size: .82em;
+  font-family: inherit;
+  color: var(--text-color);
+  background: var(--card-bg);
+}
+.team-off-form input[type='text'] { flex: 1 1 8em; min-width: 8em; }
+.team-off-form input:focus-visible,
+.team-off-form select:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+/* Bouton « Ajouter » compact, plat (sans dégradé). */
+.team-off-form button {
+  padding: .35em .8em;
+  font-size: .82em;
+  background: var(--primary);
+  box-shadow: none;
+}
+.team-off-form button:hover { filter: brightness(1.06); box-shadow: none; }
+
+.team-off-tags { display: flex; flex-wrap: wrap; gap: .4em; }
+.team-off-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: .3em;
+  background: var(--card-bg);
+  border: 1px solid var(--primary);
+  border-radius: 20px;
+  padding: .22em .65em;
+  font-size: .77em;
+  color: var(--primary-dark);
+  font-weight: 500;
+}
+.team-off-tag.pending { opacity: .55; }
+.team-off-tag.failed { outline: 1px solid #dc2626; }
+.team-off-tag button {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  filter: none;
+  color: var(--primary);
+  font-size: .9em;
+  line-height: 1;
+  border: none;
+}
+.team-off-tag button:hover { color: #dc2626; background: none; box-shadow: none; filter: none; }
+.team-off-tag button:disabled { opacity: .5; }
+.team-off-empty { font-size: .78em; color: var(--text-muted); font-style: italic; }
+
 /* ── Responsive (≤ 520px) ──────────────────────────────────────────────── */
 @media (max-width: 520px) {
   body { padding: 1.2em .8em 3em; }
@@ -609,6 +714,13 @@ button:disabled:hover { filter: none; box-shadow: none; }
   .holidays-form input[type='date'],
   .holidays-form input[type='text'] { width: 100%; }
   .holidays-form button { justify-content: center; }
+  /* Panneau jours off d'équipe : même empilement (UX-DR7). */
+  .team-off-panel { padding: .7em .6em; }
+  .team-off-form { flex-direction: column; align-items: stretch; gap: .35em; }
+  .team-off-form input[type='date'],
+  .team-off-form input[type='text'],
+  .team-off-form select { width: 100%; }
+  .team-off-form button { justify-content: center; }
 }
 
 /* ── Motion ────────────────────────────────────────────────────────────── */

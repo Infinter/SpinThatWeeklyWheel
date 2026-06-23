@@ -27,11 +27,13 @@ import {
   type GroupExclusion,
 } from '@/lib/data/group-exclusions'
 import { fetchHolidays, writeHoliday, type Holiday } from '@/lib/data/holidays'
+import { fetchTeamOffDays, writeTeamOffDay, type TeamOffDay } from '@/lib/data/team-off-days'
 import { type ChangeEvent } from '@/lib/store/reconcile'
 import { participantsReducer, type StoreParticipant } from '@/lib/store/participants-reducer'
 import { unavailabilitiesReducer, type StoreUnavailability } from '@/lib/store/unavailabilities-reducer'
 import { groupExclusionsReducer, type StoreGroupExclusion } from '@/lib/store/group-exclusions-reducer'
 import { holidaysReducer, type StoreHoliday } from '@/lib/store/holidays-reducer'
+import { teamOffDaysReducer, type StoreTeamOffDay } from '@/lib/store/team-off-days-reducer'
 import { isValidRange, isDuplicateDay, type DayOrRange } from '@/lib/domain/availability'
 import { isValidEveryN, refDateMatchesDayOfWeek } from '@/lib/domain/team-availability'
 import { parseNames } from '@/lib/store/parse-names'
@@ -72,6 +74,9 @@ function toServerGroupExclusion(g: StoreGroupExclusion): GroupExclusion {
 function toServerHoliday(h: StoreHoliday): Holiday {
   return { id: h.id, date: h.date, label: h.label, updated_at: h.updated_at }
 }
+function toServerTeamOffDay(o: StoreTeamOffDay): TeamOffDay {
+  return { id: o.id, kind: o.kind, date1: o.date1, date2: o.date2, label: o.label, updated_at: o.updated_at }
+}
 
 // Forme « optionnelle » des inputs d'une indispo, telle que fournie par l'UI.
 type UnavailabilityInput = { kind: 'day' | 'range'; date1: string; date2: string | null }
@@ -81,6 +86,9 @@ type GroupExclusionInput = { day_of_week: number; every_n: number; ref_date: str
 
 // Inputs d'un jour férié, tels que fournis par l'UI.
 type HolidayInput = { date: string; label: string }
+
+// Inputs d'un jour off d'équipe, tels que fournis par l'UI (libellé OPTIONNEL → trimé → null côté store).
+type TeamOffDayInput = { kind: 'day' | 'range'; date1: string; date2: string | null; label: string }
 
 // ── Contexte exposé ─────────────────────────────────────────────────────────
 type StoreValue = {
@@ -102,6 +110,10 @@ type StoreValue = {
   addHoliday: (input: HolidayInput) => void
   removeHoliday: (id: string) => void
   retryHoliday: (id: string) => void
+  teamOffDays: StoreTeamOffDay[]
+  addTeamOffDay: (input: TeamOffDayInput) => void
+  removeTeamOffDay: (id: string) => void
+  retryTeamOffDay: (id: string) => void
   error: string | null
   clearError: () => void
   passphraseNeeded: boolean
@@ -116,12 +128,14 @@ export function ParticipantsStoreProvider({
   initialUnavailabilities,
   initialGroupExclusions,
   initialHolidays,
+  initialTeamOffDays,
   children,
 }: {
   initial: Participant[]
   initialUnavailabilities: Unavailability[]
   initialGroupExclusions: GroupExclusion[]
   initialHolidays: Holiday[]
+  initialTeamOffDays: TeamOffDay[]
   children: ReactNode
 }) {
   const [participants, dispatch] = useReducer(participantsReducer, initial as StoreParticipant[])
@@ -134,6 +148,10 @@ export function ParticipantsStoreProvider({
     initialGroupExclusions as StoreGroupExclusion[],
   )
   const [holidays, dispatchH] = useReducer(holidaysReducer, initialHolidays as StoreHoliday[])
+  const [teamOffDays, dispatchO] = useReducer(
+    teamOffDaysReducer,
+    initialTeamOffDays as StoreTeamOffDay[],
+  )
   const [error, setError] = useState<string | null>(null)
 
   // File d'écriture partagée + passphrase (extraite en 3.2). TABLE-AGNOSTIQUE : un seul prompt pour N (AD-8).
@@ -143,11 +161,13 @@ export function ParticipantsStoreProvider({
   const useqRef = useRef(0) // ids temporaires d'insert indispo (`utemp:<n>`).
   const gseqRef = useRef(0) // ids temporaires d'insert exclusion de groupe (`gtemp:<n>`).
   const hseqRef = useRef(0) // ids temporaires d'insert jour férié (`htemp:<n>`).
+  const oseqRef = useRef(0) // ids temporaires d'insert jour off (`otemp:<n>`).
   // Miroirs d'état pour lire un snapshot de ligne hors closure.
   const stateRef = useRef(participants)
   const stateRefU = useRef(unavailabilities)
   const stateRefG = useRef(groupExclusions)
   const stateRefH = useRef(holidays)
+  const stateRefO = useRef(teamOffDays)
   useEffect(() => {
     stateRef.current = participants
   }, [participants])
@@ -160,6 +180,9 @@ export function ParticipantsStoreProvider({
   useEffect(() => {
     stateRefH.current = holidays
   }, [holidays])
+  useEffect(() => {
+    stateRefO.current = teamOffDays
+  }, [teamOffDays])
 
   // ── Participants ────────────────────────────────────────────────────────────
   // Chemin INTERNE par nom : crée une ligne optimiste + déclenche l'insert (réutilisé par addParticipants).
@@ -481,6 +504,73 @@ export function ParticipantsStoreProvider({
 
   const retryHoliday = useCallback((id: string) => retry(id), [retry])
 
+  // ── Jours off d'équipe (Story 3.3) ────────────────────────────────────────────
+  // Ajout (FR8) : validation cliente PURE d'abord (AC5) → si invalide, message FR + AUCUNE écriture.
+  // Sinon optimiste ADD_OPTIMISTIC + insert serveur. Libellé OPTIONNEL (trimé → null). PAS de dédup :
+  // `team_off_days` n'a aucune contrainte d'unicité (≠ fériés/indispos-jour).
+  const addTeamOffDay = useCallback(
+    (input: TeamOffDayInput) => {
+      const { kind, date1 } = input
+      if (!date1) {
+        setError('Veuillez saisir une date.')
+        return
+      }
+      if (kind === 'range') {
+        if (!input.date2) {
+          setError('Veuillez saisir la date de fin.')
+          return
+        }
+        if (!isValidRange(date1, input.date2)) {
+          setError('La date de fin doit être postérieure ou égale au début.')
+          return
+        }
+      }
+      const date2 = kind === 'range' ? input.date2 : null
+      const label = input.label.trim() || null
+      const tempId = `otemp:${oseqRef.current++}`
+      const row: TeamOffDay = { id: tempId, kind, date1, date2, label, updated_at: '' }
+      dispatchO({ type: 'ADD_OPTIMISTIC', tempId, row })
+      void runWrite({
+        write: (pp) => writeTeamOffDay('insert', { data: { kind, date1, date2, label } }, pp),
+        onPending: () => dispatchO({ type: 'SET_PENDING', id: tempId }),
+        onConfirm: (r) => dispatchO({ type: 'CONFIRM', tempId, row: r as TeamOffDay }),
+        onFailed: () => dispatchO({ type: 'MARK_FAILED', id: tempId }),
+        rollback: () => dispatchO({ type: 'ROLLBACK', tempId }),
+        onConflictRehydrate: async () => {
+          try {
+            dispatchO({ type: 'HYDRATE', rows: await fetchTeamOffDays() })
+          } catch {
+            /* Realtime prendra le relais. */
+          }
+        },
+        retryKey: tempId,
+      })
+    },
+    [runWrite],
+  )
+
+  // Suppression unitaire (✕) : snapshot AVANT REMOVE → restauration si échec (delete idempotent).
+  const removeTeamOffDay = useCallback(
+    (id: string) => {
+      const snapshot = stateRefO.current.find((o) => o.id === id)
+      if (!snapshot) return
+      const restore = toServerTeamOffDay(snapshot)
+      dispatchO({ type: 'REMOVE', id })
+      void runWrite({
+        write: (pp) => writeTeamOffDay('delete', { id }, pp),
+        onConfirm: () => {
+          /* déjà retiré ; l'écho Realtime DELETE est un no-op (AD-15). */
+        },
+        rollback: () => dispatchO({ type: 'RESTORE', row: restore }),
+        deleteIdempotent: true,
+        retryKey: null,
+      })
+    },
+    [runWrite],
+  )
+
+  const retryTeamOffDay = useCallback((id: string) => retry(id), [retry])
+
   const clearError = useCallback(() => setError(null), [])
 
   // ── Abonnement Realtime participants + re-hydratation à chaque (re)connexion (AD-6) ──────
@@ -593,6 +683,33 @@ export function ParticipantsStoreProvider({
     }
   }, [])
 
+  // ── 5ᵉ abonnement Realtime : jours off d'équipe (Story 3.3, AD-6) ────────────
+  useEffect(() => {
+    const channel = supabasePublic
+      .channel('team-off-days-rt')
+      .on<TeamOffDay>(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'team_off_days' },
+        (payload) => {
+          const event = mapChange<TeamOffDay>(payload)
+          if (event) dispatchO({ type: 'REALTIME', event })
+        },
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          fetchTeamOffDays()
+            .then((rows) => dispatchO({ type: 'HYDRATE', rows }))
+            .catch(() => {
+              /* refetch impossible : un prochain SUBSCRIBED réessaiera. */
+            })
+        }
+      })
+
+    return () => {
+      void supabasePublic.removeChannel(channel)
+    }
+  }, [])
+
   const value: StoreValue = {
     participants,
     addParticipants,
@@ -612,6 +729,10 @@ export function ParticipantsStoreProvider({
     addHoliday,
     removeHoliday,
     retryHoliday,
+    teamOffDays,
+    addTeamOffDay,
+    removeTeamOffDay,
+    retryTeamOffDay,
     error,
     clearError,
     passphraseNeeded,

@@ -11,7 +11,7 @@
     "test:realtime": "vitest run tests/realtime.integration.test.ts",
     "test:read": "vitest run tests/read.integration.test.ts",
     "test:write": "vitest run tests/write.integration.test.ts",
-    "test:unit": "vitest run tests/write-error.unit.test.ts tests/reconcile.unit.test.ts tests/parse-names.unit.test.ts tests/participants-reducer.unit.test.ts tests/availability.unit.test.ts tests/unavailabilities-reducer.unit.test.ts tests/group-exclusions.unit.test.ts tests/group-exclusions-reducer.unit.test.ts tests/holidays.unit.test.ts tests/holidays-reducer.unit.test.ts"
+    "test:unit": "vitest run tests/write-error.unit.test.ts tests/reconcile.unit.test.ts tests/parse-names.unit.test.ts tests/participants-reducer.unit.test.ts tests/availability.unit.test.ts tests/unavailabilities-reducer.unit.test.ts tests/group-exclusions.unit.test.ts tests/group-exclusions-reducer.unit.test.ts tests/holidays.unit.test.ts tests/holidays-reducer.unit.test.ts tests/team-off-days.unit.test.ts tests/team-off-days-reducer.unit.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

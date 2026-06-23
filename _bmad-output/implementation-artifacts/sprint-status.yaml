@@ -63,6 +63,9 @@ story_location: _bmad-output/implementation-artifacts
 # 2026-06-23 — Story 3.2 contextée (Amelia/create-story) : backlog → ready-for-dev.
 # 2026-06-23 — Story 3.2 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
 # 2026-06-23 — Story 3.2 implémentée (Amelia/dev-story) : in-progress → review.
+# 2026-06-23 — Story 3.3 contextée (Amelia/create-story) : backlog → ready-for-dev.
+# 2026-06-23 — Story 3.3 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
+# 2026-06-23 — Story 3.3 implémentée (Amelia/dev-story) : in-progress → review.
 
 development_status:
   epic-1: in-progress
@@ -80,7 +83,7 @@ development_status:
   epic-3: in-progress
   3-1-exclusions-de-groupe-recurrentes: review
   3-2-jours-feries: review
-  3-3-jours-off-equipe: backlog
+  3-3-jours-off-equipe: review
   epic-3-retrospective: optional
   epic-4: backlog
   4-1-options-generation-weekends-date-debut: backlog

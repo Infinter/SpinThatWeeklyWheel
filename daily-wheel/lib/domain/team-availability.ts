@@ -4,15 +4,15 @@
 //
 // `isTeamNonSessionDay` est l'UNIQUE source de vérité du « jour neutralisé » mandatée par AD-3 :
 // le même prédicat sera branché dans la boucle de génération ET le calcul de deadline EDF en
-// Story 4.2. Il agrège (en `||`) les 4 contraintes d'équipe. En Story 3.1, SEULE la branche
-// « exclusions de groupe » est câblée ; 3.2 (jours fériés), 3.3 (jours off) et 4.1 (week-ends)
-// AJOUTERONT leur branche ici, SANS toucher la signature.
+// Story 4.2. Il agrège (en `||`) les 4 contraintes d'équipe. Branches câblées : « exclusions de groupe »
+// (3.1), « jours fériés » (3.2), « jours off » (3.3). Seule 4.1 (week-ends) AJOUTERA sa branche ici,
+// SANS toucher la signature.
 //
 // Calendrier : conversion `YYYY-MM-DD` → n° de jour absolu via l'algorithme entier
 // « days-from-civil » (Howard Hinnant). Sans `Date`, sans timezone, sans dérive DST — donc
 // strictement plus correct que le legacy `Math.round((t1-t2)/86400000)` (convention dates).
 
-import type { DayOrRange } from '@/lib/domain/availability'
+import { isPersonUnavailable, type DayOrRange } from '@/lib/domain/availability'
 
 // Une règle d'exclusion de groupe (forme structurelle du domaine — n'importe PAS le type data).
 //   day_of_week : 0=dimanche … 6=samedi (= Date.getDay()).
@@ -24,9 +24,9 @@ export type GroupExclusionRule = {
   ref_date: string // YMD
 }
 
-// Contraintes d'équipe agrégées par `isTeamNonSessionDay` (AD-3). Forme COMPLÈTE déclarée dès 3.1 ;
-// seule `groupExclusions` est évaluée pour l'instant. `holidays` (3.2), `teamOffDays` (3.3) et
-// `skipWeekends` (4.1) sont déclarés mais sans effet ici.
+// Contraintes d'équipe agrégées par `isTeamNonSessionDay` (AD-3). Forme COMPLÈTE déclarée dès 3.1.
+// `groupExclusions` (3.1), `holidays` (3.2) et `teamOffDays` (3.3) sont évalués ; seul `skipWeekends`
+// (4.1) est déclaré mais sans effet ici.
 export type TeamConstraints = {
   skipWeekends?: boolean
   groupExclusions?: GroupExclusionRule[]
@@ -79,11 +79,23 @@ export function isHoliday(holidays: { date: string }[], date: string): boolean {
   return holidays.some((h) => h.date === date)
 }
 
+// Vrai ssi `date` (YMD) tombe dans l'un des jours off d'équipe (Story 3.3, jour OU plage).
+// ALIAS sémantique de `isPersonUnavailable` (domaine voisin) : un jour off d'équipe neutralise
+// EXACTEMENT comme une indispo individuelle (jour → date1 === date ; plage → date1 <= date <= date2,
+// bornes incluses). La logique de bornes n'est PAS réimplémentée (anti-réinvention). Liste vide → false.
+export function isTeamOffDay(offDays: DayOrRange[], date: string): boolean {
+  return isPersonUnavailable(offDays, date)
+}
+
 // UNIQUE prédicat « jour neutralisé » de l'équipe (AD-3). Story 3.1 : branche « exclusions de groupe ».
-// Story 3.2 : branche « jours fériés » AJOUTÉE en `||`. 3.3 (jours off) et 4.1 (week-ends) ajouteront
-// les leurs ici, sans changer la signature.
+// Story 3.2 : branche « jours fériés » AJOUTÉE en `||`. Story 3.3 : branche « jours off » AJOUTÉE en `||`.
+// Seule 4.1 (week-ends) ajoutera la sienne ici, sans changer la signature.
 export function isTeamNonSessionDay(date: string, ctx: TeamConstraints): boolean {
-  return isGroupExcluded(ctx.groupExclusions ?? [], date) || isHoliday(ctx.holidays ?? [], date)
+  return (
+    isGroupExcluded(ctx.groupExclusions ?? [], date) ||
+    isHoliday(ctx.holidays ?? [], date) ||
+    isTeamOffDay(ctx.teamOffDays ?? [], date)
+  )
 }
 
 // Validateurs d'entrée purs (validation primaire AC1, co-localisés dans ce module pur testé en CI).
