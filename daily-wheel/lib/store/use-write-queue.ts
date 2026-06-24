@@ -51,6 +51,11 @@ export type WriteSpec = {
   onConflictRehydrate?: () => Promise<void> // 409 non-idempotent : re-hydrate depuis la source canonique
   retryKey?: string | null // clé failedWritesRef (retry) ; null pour un delete (pas de retry)
   deleteIdempotent?: boolean // delete : 409 « introuvable » = déjà supprimé ailleurs → succès idempotent (AD-16)
+  // Écriture BEST-EFFORT (Story 5.6, « dégradation gracieuse ») : un échec ne lève PAS le bandeau d'erreur
+  // global (la mécanique optimiste/rollback/retry reste appliquée). Utilisé par la persistance rotation_state :
+  // la roue tourne et le planning s'affiche même si la sauvegarde (reprise après reload) échoue — inutile de
+  // nagger l'utilisateur. Décision Solo 2026-06-24.
+  silent?: boolean
 }
 
 export type WriteQueue = {
@@ -107,7 +112,7 @@ export function useWriteQueue({ setError }: { setError: (message: string | null)
         } else {
           spec.rollback()
         }
-        setError('Erreur inattendue lors de l’écriture. Réessaie.')
+        if (!spec.silent) setError('Erreur inattendue lors de l’écriture. Réessaie.')
         return
       }
       // Taxonomie d'erreurs d'écriture (AD-17).
@@ -120,7 +125,7 @@ export function useWriteQueue({ setError }: { setError: (message: string | null)
           break
         case 'validation': // 400 : rollback de l'optimiste + message.
           spec.rollback()
-          setError(e.message)
+          if (!spec.silent) setError(e.message)
           break
         case 'conflict': // 409.
           if (spec.deleteIdempotent) {
@@ -128,18 +133,18 @@ export function useWriteQueue({ setError }: { setError: (message: string | null)
             break
           }
           await spec.onConflictRehydrate?.()
-          setError('Conflit détecté — état resynchronisé avec le serveur.')
+          if (!spec.silent) setError('Conflit détecté — état resynchronisé avec le serveur.')
           break
         case 'transient': // 5xx.
           if (spec.retryKey != null) {
             // insert/update : on garde l'optimiste + bouton « Réessayer » (rejoue l'op d'origine, AC5).
             spec.onFailed?.()
             failedWritesRef.current.set(spec.retryKey, spec)
-            setError('Échec temporaire — tu peux réessayer.')
+            if (!spec.silent) setError('Échec temporaire — tu peux réessayer.')
           } else {
             // delete : la ligne a déjà disparu → on la restaure et on invite à recommencer.
             spec.rollback()
-            setError('Échec temporaire de la suppression — réessaie.')
+            if (!spec.silent) setError('Échec temporaire de la suppression — réessaie.')
           }
           break
       }

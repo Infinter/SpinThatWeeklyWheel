@@ -776,6 +776,10 @@ export function ParticipantsStoreProvider({
           }
         },
         retryKey: 'rotation_state',
+        // Best-effort (Story 5.6, « dégradation gracieuse ») : un échec de sauvegarde de la rotation ne
+        // doit PAS lever le bandeau d'erreur global — la roue/planning fonctionnent côté client (décision
+        // Solo 2026-06-24). Seule la reprise après reload est perdue tant que la migration n'est pas appliquée.
+        silent: true,
       })
     },
     [runWrite],
