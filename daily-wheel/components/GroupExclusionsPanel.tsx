@@ -91,7 +91,7 @@ export function GroupExclusionsPanel() {
 
           <div className="group-excl-tags">
             {groupExclusions.length === 0 ? (
-              <span className="group-excl-empty">Aucune règle définie.</span>
+              <span className="group-excl-empty">Aucune exclusion de groupe — ajoute une règle si besoin.</span>
             ) : (
               groupExclusions
                 .slice()

@@ -32,7 +32,7 @@ export function shouldChainNext(mode: SpinMode, revealedCount: number, planningL
 export function ctaLabelFor(mode: SpinMode, revealedCount: number, planningLen: number): string {
   const complete = isRotationComplete(revealedCount, planningLen)
   if (mode === 'rotation-complete') {
-    return complete ? '🎡 Relancer la rotation' : '🎡 Lancer la rotation'
+    return complete ? '🎡 Relancer la rotation' : '🎡 Lancer la roue'
   }
   // jour-le-jour
   if (complete) return '✓ Rotation complète'

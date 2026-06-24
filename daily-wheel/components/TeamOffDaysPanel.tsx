@@ -97,7 +97,7 @@ export function TeamOffDaysPanel() {
 
           <div className="team-off-tags">
             {teamOffDays.length === 0 ? (
-              <span className="team-off-empty">Aucun jour off défini.</span>
+              <span className="team-off-empty">Aucun jour off d’équipe — ajoute-en un si besoin.</span>
             ) : (
               teamOffDays
                 .slice()

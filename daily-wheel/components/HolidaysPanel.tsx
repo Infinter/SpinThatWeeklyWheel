@@ -70,7 +70,7 @@ export function HolidaysPanel() {
 
           <div className="holidays-tags">
             {holidays.length === 0 ? (
-              <span className="holidays-empty">Aucun jour férié défini.</span>
+              <span className="holidays-empty">Aucun jour férié — ajoute-en un si la rotation en croise.</span>
             ) : (
               holidays
                 .slice()

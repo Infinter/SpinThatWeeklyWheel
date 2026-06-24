@@ -54,7 +54,7 @@ export default async function Home() {
     >
       <header className="app-header">
         <div className="app-header-icon" aria-hidden="true">
-          🎲
+          🎡
         </div>
         <div className="app-header-text">
           <h1>Daily Wheel</h1>

@@ -61,9 +61,9 @@ describe('shouldChainNext (Story 5.5, AC-9c)', () => {
 
 describe('ctaLabelFor (Story 5.5, AC-9a — libellés au mot près)', () => {
   it('mode « Rotation complète » : Lancer → (en cours) → Relancer', () => {
-    expect(ctaLabelFor(ROTATION, 0, 6)).toBe('🎡 Lancer la rotation') // rien révélé
-    expect(ctaLabelFor(ROTATION, 3, 6)).toBe('🎡 Lancer la rotation') // en cours (bouton désactivé)
-    expect(ctaLabelFor(ROTATION, 6, 6)).toBe('🎡 Relancer la rotation') // terminé
+    expect(ctaLabelFor(ROTATION, 0, 6)).toBe('🎡 Lancer la roue') // rien révélé — gel microcopie 5.8 (UX-DR12)
+    expect(ctaLabelFor(ROTATION, 3, 6)).toBe('🎡 Lancer la roue') // en cours (bouton désactivé)
+    expect(ctaLabelFor(ROTATION, 6, 6)).toBe('🎡 Relancer la rotation') // terminé — « Relancer la rotation » conservé (UX)
   })
 
   it('mode « Jour le jour » : premier → suivant → ✓ complète', () => {

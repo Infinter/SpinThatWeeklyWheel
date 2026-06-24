@@ -113,7 +113,7 @@ export function ParticipantsCard() {
       )}
 
       {participants.length === 0 ? (
-        <p className="card-empty">Aucun participant pour le moment.</p>
+        <p className="card-empty">Ajoute ton premier participant ci-dessus pour lancer la roue.</p>
       ) : (
         <table className="participant-table">
           <thead>

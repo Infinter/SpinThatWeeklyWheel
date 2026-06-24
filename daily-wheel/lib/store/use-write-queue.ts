@@ -107,7 +107,7 @@ export function useWriteQueue({ setError }: { setError: (message: string | null)
         } else {
           spec.rollback()
         }
-        setError('Erreur inattendue lors de l’écriture. Réessayez.')
+        setError('Erreur inattendue lors de l’écriture. Réessaie.')
         return
       }
       // Taxonomie d'erreurs d'écriture (AD-17).
@@ -135,11 +135,11 @@ export function useWriteQueue({ setError }: { setError: (message: string | null)
             // insert/update : on garde l'optimiste + bouton « Réessayer » (rejoue l'op d'origine, AC5).
             spec.onFailed?.()
             failedWritesRef.current.set(spec.retryKey, spec)
-            setError('Échec temporaire — vous pouvez réessayer.')
+            setError('Échec temporaire — tu peux réessayer.')
           } else {
             // delete : la ligne a déjà disparu → on la restaure et on invite à recommencer.
             spec.rollback()
-            setError('Échec temporaire de la suppression — réessayez.')
+            setError('Échec temporaire de la suppression — réessaie.')
           }
           break
       }

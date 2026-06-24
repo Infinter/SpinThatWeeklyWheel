@@ -321,13 +321,13 @@ export function ScheduleResult() {
           {ctaLabelFor(mode, revealedCount, planningLen)}
         </button>
         {!canGenerate && (
-          <span className="card-empty">Ajoutez au moins un participant actif.</span>
+          <span className="card-empty">Ajoute au moins un participant actif pour lancer la roue.</span>
         )}
       </div>
 
       {schedule === null ? (
         <p className="card-empty">
-          Cliquez sur « {ctaLabelFor(mode, 0, 0)} » pour générer le planning.
+          Clique sur « {ctaLabelFor(mode, 0, 0)} » pour lancer le tirage.
         </p>
       ) : schedule.planning.length > 0 ? (
         <div className="schedule-result">

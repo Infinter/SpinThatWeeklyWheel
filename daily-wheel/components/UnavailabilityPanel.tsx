@@ -72,7 +72,7 @@ export function UnavailabilityPanel({ participantId }: { participantId: string }
 
       <div className="indispo-tags">
         {rows.length === 0 ? (
-          <span className="indispo-empty">Aucune indisponibilité enregistrée.</span>
+          <span className="indispo-empty">Aucune indisponibilité — ajoute une date ou une plage si besoin.</span>
         ) : (
           rows.map((u) => {
             const label =

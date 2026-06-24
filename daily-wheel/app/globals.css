@@ -1069,4 +1069,12 @@ button:disabled:hover { filter: none; box-shadow: none; }
   /* Story 5.7 (UX-DR13) : pas d'animation d'ouverture de l'aperçu ni du toast. */
   .export-preview.show { animation: none; }
   .toast { animation: none; }
+  /* Story 5.8 (UX-DR13) — balayage de complétude « partout » : neutralise aussi les micro-transitions
+     restantes (badge d'étape du stepper, flèches des panneaux dépliables, bascule actif/inactif). */
+  .step .num,
+  .group-excl-arrow,
+  .holidays-arrow,
+  .team-off-arrow,
+  .toggle-active,
+  .toggle-active::before { transition: none; }
 }
