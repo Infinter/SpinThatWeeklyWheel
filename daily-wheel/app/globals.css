@@ -1057,7 +1057,77 @@ button:disabled:hover { filter: none; box-shadow: none; }
 /* Mobile (≤ 520 px) : l'indice « exactement ce qui est copié » est masqué (mockup:242) ; la barre reflue. */
 @media (max-width: 520px) {
   .ep-head .ep-hint { display: none; }
+  /* Story 5.9 (NFR5) : popover en FEUILLE pleine largeur en bas d'écran, formulaire empilé. */
+  .popover-scrim { align-items: flex-end; padding: 0; }
+  .constraint-popover {
+    width: 100%; max-width: 100%;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    animation: sheet-in .2s ease-out;
+  }
 }
+@keyframes sheet-in { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: none; } }
+
+/* ── Story 5.9 — résumé d'équipe (roster-chip), popover d'indispos, bandeau de relance ──────── */
+
+/* Résumé d'équipe cliquable. NB : `.chip` est un <button> → on neutralise le style primaire de base
+   (fond bleu/ombre) pour une pilule claire. Couleur d'avatar = contrat partagé roue/timeline (inline). */
+.roster { display: flex; flex-wrap: wrap; gap: 8px; margin: .25rem 0 1rem; }
+.chip {
+  display: inline-flex; align-items: center; gap: .45em;
+  min-height: 40px;                          /* cible tactile mobile (NFR5) */
+  padding: .3em .8em .3em .35em;
+  background: var(--card-bg); color: var(--text-color);
+  border: 1px solid var(--border); border-radius: 999px;
+  box-shadow: none; font-weight: 600; font-size: .85rem;
+  transition: border-color .15s, box-shadow .15s;
+}
+.chip:hover { filter: none; border-color: var(--primary); box-shadow: 0 2px 8px rgba(0, 120, 212, .12); }
+.chip-av {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  color: #fff; font-weight: 700; font-size: .8rem; flex: none;
+}
+.chip-nm { line-height: 1; }
+.chip.out { opacity: .6; }
+.chip.out .chip-nm { text-decoration: line-through; text-decoration-color: var(--text-muted); }
+.chip-state { font-size: .7rem; font-weight: 700; color: var(--text-muted); }
+
+/* Popover : voile LÉGER (ne masque pas le tirage) + carte ancrée centrée (feuille en bas sous 520px). */
+.popover-scrim {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  background: rgba(15, 23, 42, .08);
+}
+.constraint-popover {
+  width: 320px; max-width: 100%;
+  background: var(--card-bg); color: var(--text-color);
+  border: 1px solid var(--border); border-radius: var(--border-radius);
+  box-shadow: var(--shadow-card);
+  padding: .9em 1em 1em;
+  animation: popover-in .16s ease-out;
+}
+.popover-head { display: flex; align-items: center; gap: .5em; margin-bottom: .2em; }
+.popover-title { flex: 1; font-weight: 700; }
+.popover-close {
+  flex: none; padding: .2em .45em; font-size: 1rem;
+  background: transparent; color: var(--text-muted);
+  border: none; box-shadow: none; border-radius: var(--radius-sm);
+}
+.popover-close:hover { filter: none; box-shadow: none; color: var(--text-color); }
+@keyframes popover-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Bandeau de relance non destructif : non modal, ne recouvre jamais le planning. */
+.rerun-nudge {
+  display: flex; align-items: center; flex-wrap: wrap; gap: .75em;
+  margin: 0 0 1rem; padding: .55em .8em;
+  background: var(--primary-light);
+  border: 1px solid var(--excl-border);       /* #bfdbfe (DESIGN.md:169) */
+  border-radius: var(--radius-sm);
+  animation: nudge-in .2s ease-out;
+}
+.rerun-nudge-text { flex: 1; min-width: 12ch; font-size: .9rem; font-weight: 600; color: var(--text-color); }
+.rerun-nudge button { padding: .4em .9em; font-size: .85rem; white-space: nowrap; }   /* compact primaire hérité */
+@keyframes nudge-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
 /* ── Motion ────────────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
@@ -1077,4 +1147,8 @@ button:disabled:hover { filter: none; box-shadow: none; }
   .team-off-arrow,
   .toggle-active,
   .toggle-active::before { transition: none; }
+  /* Story 5.9 (UX-DR13) : apparition douce du nudge et ouverture du popover neutralisées. */
+  .rerun-nudge { animation: none; }
+  .constraint-popover { animation: none; }
+  .chip { transition: none; }
 }

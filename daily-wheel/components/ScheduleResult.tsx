@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParticipants } from '@/lib/store/participants-store'
 import { ScheduleTimeline } from '@/components/ScheduleTimeline'
 import { SpinWheel } from '@/components/SpinWheel'
+import { RosterChips } from '@/components/RosterChips'
+import { ConstraintPopover } from '@/components/ConstraintPopover'
+import { RerunNudge } from '@/components/RerunNudge'
 import { buildWheelSegments } from '@/lib/ui/wheel'
 import { buildColorIndexMap } from '@/lib/ui/participant-colors'
 import { clampCursor } from '@/lib/ui/rotation-resume'
@@ -71,6 +74,15 @@ export function ScheduleResult() {
   // Demande de spin automatique du 1er jour juste après une (re)génération (state, pas ref : lisible et
   // ajustable pendant le rendu via le pattern « ajuster l'état pendant le rendu »).
   const [autoSpin, setAutoSpin] = useState(false)
+
+  // Popover d'indispos (Story 5.9) : id du participant en cours d'édition (`null` = fermé). État
+  // purement UI/éphémère ⇒ local au composant (pas dans le store).
+  const [openParticipantId, setOpenParticipantId] = useState<string | null>(null)
+  const openParticipant = openParticipantId
+    ? (participants.find((p) => p.id === openParticipantId) ?? null)
+    : null
+  // Référence stable : évite de re-déclencher les effets du popover à chaque ré-rendu du parent.
+  const closePopover = useCallback(() => setOpenParticipantId(null), [])
 
   // Export (Story 5.7) : format affiché dans l'aperçu (`null` = panneau fermé) + toast transitoire.
   const [exportFmt, setExportFmt] = useState<ExportFormat | null>(null)
@@ -339,6 +351,13 @@ export function ScheduleResult() {
             </span>
           </div>
 
+          {/* Bandeau de relance non destructif (Story 5.9) : visible si une contrainte a changé depuis
+              le tirage. Ne recouvre pas le planning ; « Relancer » = nouveau tirage. */}
+          <RerunNudge />
+
+          {/* Résumé d'équipe cliquable (Story 5.9) : éditer une indispo sans quitter le tirage. */}
+          <RosterChips onOpen={setOpenParticipantId} />
+
           {/* Roue : visible tant que la rotation n'est pas révélée en entier. */}
           {!rotationComplete && (
             <SpinWheel
@@ -404,6 +423,16 @@ export function ScheduleResult() {
         </div>
       ) : (
         <p className="card-empty">Aucun participant n&apos;a pu être planifié.</p>
+      )}
+
+      {/* Popover d'édition rapide des indispos (Story 5.9) : overlay au-dessus du tirage, ferme par
+          Échap / clic extérieur / ✕. L'écriture (optimiste) déclenche le nudge via `scheduleStale`. */}
+      {openParticipant && (
+        <ConstraintPopover
+          participantId={openParticipant.id}
+          participantName={openParticipant.name}
+          onClose={closePopover}
+        />
       )}
 
       {/* Toast transitoire (Story 5.7) : confirmation de copie / garde-fou export. Région live distincte. */}

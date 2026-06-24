@@ -61,6 +61,7 @@ import {
   type ScheduleResult,
 } from '@/lib/domain/schedule'
 import { createRng } from '@/lib/domain/rng'
+import { scheduleSignature } from '@/lib/ui/schedule-signature'
 import { todayYMD } from '@/lib/format/date-fr'
 import { parseNames } from '@/lib/store/parse-names'
 import { useWriteQueue } from '@/lib/store/use-write-queue'
@@ -189,6 +190,10 @@ type StoreValue = {
   // graine persistée (jamais sérialisé en base — AC-2). `null` tant qu'aucune rotation n'a été tirée.
   schedule: ScheduleResult | null
   generate: () => void
+  // Péremption du planning (Story 5.9, rerun-nudge) : vrai ssi un planning est affiché ET une contrainte
+  // a changé depuis sa génération (indispo/férié/off/exclusion/toggle actif/option) — y compris via
+  // Realtime d'un autre poste. Dérivé pur ; la relance (`generate()`) le remet à false.
+  scheduleStale: boolean
   // Rotation persistée (Story 5.6, FR18) : curseur de révélation + mode, reflétés depuis rotation_state
   // (source canonique Supabase, AD-4). Le composant Spin LIT ces valeurs pour reprendre au bon jour.
   rotationCursor: number
@@ -268,6 +273,23 @@ export function ParticipantsStoreProvider({
             (initialSettings ?? DEFAULT_SETTING) as StoreSetting,
           ),
           createRng(initialRotationState.seed),
+        )
+      : null,
+  )
+  // Signature des contraintes au moment où le `schedule` courant a été produit (Story 5.9, rerun-nudge).
+  // Figée à chaque (re)génération et à la reprise depuis seed ; comparée à la signature COURANTE à chaque
+  // rendu pour dériver `scheduleStale`. `null` tant qu'aucun planning n'existe.
+  const [signatureAtGenerate, setSignatureAtGenerate] = useState<string | null>(() =>
+    initialRotationState && initialRotationState.seed != null
+      ? scheduleSignature(
+          buildScheduleInput(
+            initial as StoreParticipant[],
+            initialUnavailabilities as StoreUnavailability[],
+            initialGroupExclusions as StoreGroupExclusion[],
+            initialHolidays as StoreHoliday[],
+            initialTeamOffDays as StoreTeamOffDay[],
+            (initialSettings ?? DEFAULT_SETTING) as StoreSetting,
+          ),
         )
       : null,
   )
@@ -789,6 +811,8 @@ export function ParticipantsStoreProvider({
     )
     const seed = Math.floor(Math.random() * 0x100000000)
     setSchedule(generateSchedule(input, createRng(seed)))
+    // Fige la signature des entrées AYANT produit ce planning (même `input`) ⇒ scheduleStale=false (5.9).
+    setSignatureAtGenerate(scheduleSignature(input))
     updateRotationState({ seed, cursor: 0 })
   }, [
     participants,
@@ -973,19 +997,18 @@ export function ParticipantsStoreProvider({
     // les refs miroir (toujours à jour, hors closure). Utilisé à l'abonnement et sur changement de graine.
     const recomputeFromSeed = (seed: number | null | undefined) => {
       if (seed == null) return
-      setSchedule(
-        generateSchedule(
-          buildScheduleInput(
-            stateRef.current,
-            stateRefU.current,
-            stateRefG.current,
-            stateRefH.current,
-            stateRefO.current,
-            stateRefS.current,
-          ),
-          createRng(seed),
-        ),
+      const input = buildScheduleInput(
+        stateRef.current,
+        stateRefU.current,
+        stateRefG.current,
+        stateRefH.current,
+        stateRefO.current,
+        stateRefS.current,
       )
+      setSchedule(generateSchedule(input, createRng(seed)))
+      // Relance venue d'un autre poste = NOUVEAU planning aligné sur les contraintes courantes ⇒ non
+      // périmé : on re-fige la signature (5.9). Sinon le nudge s'afficherait à tort après une relance distante.
+      setSignatureAtGenerate(scheduleSignature(input))
     }
     const channel = supabasePublic
       .channel('rotation-state-rt')
@@ -1023,6 +1046,15 @@ export function ParticipantsStoreProvider({
     }
   }, [])
 
+  // Story 5.9 — péremption dérivée PURE (aucun effet) : signature COURANTE des entrées vs signature figée
+  // au dernier `generate()`/reprise. Recalculée à chaque rendu ⇒ auto-correcteur sur rollback optimiste
+  // (AD-5 : le slice revient, la signature aussi, le nudge disparaît). Capte aussi les changements Realtime.
+  const currentSignature = scheduleSignature(
+    buildScheduleInput(participants, unavailabilities, groupExclusions, holidays, teamOffDays, settings),
+  )
+  const scheduleStale =
+    schedule !== null && signatureAtGenerate !== null && currentSignature !== signatureAtGenerate
+
   const value: StoreValue = {
     participants,
     addParticipants,
@@ -1052,6 +1084,7 @@ export function ParticipantsStoreProvider({
     retrySettings,
     schedule,
     generate,
+    scheduleStale,
     rotationCursor: rotationState.cursor,
     rotationMode: rotationState.mode,
     persistRotationCursor,
