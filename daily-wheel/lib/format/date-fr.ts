@@ -37,6 +37,16 @@ export function monthShortFr(ymd: string): string {
   return parseYMD(ymd).toLocaleDateString('fr-FR', { month: 'short' }).replace(/\.$/, '')
 }
 
+// Date longue FR SANS jour de semaine (ex. « 23 juin 2026 »). Story 5.7 : en-tête du message Slack
+// (« semaine du {date de début} »). Mêmes conventions : parsing LOCAL via `parseYMD`, jamais UTC.
+export function dateLongNoWeekdayFr(ymd: string): string {
+  return parseYMD(ymd).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
 // Date du jour en `YYYY-MM-DD` LOCAL (défaut d'affichage de la date de début — Story 4.1, FR10).
 // CRITIQUE : formatage local via getFullYear/getMonth/getDate, JAMAIS toISOString() (UTC → décalage).
 export function todayYMD(): string {

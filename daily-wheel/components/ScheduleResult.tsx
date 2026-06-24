@@ -16,6 +16,7 @@ import {
   type SpinMode,
 } from '@/lib/ui/spin-mode'
 import { formatDateFr } from '@/lib/format/date-fr'
+import { buildSlackExport, buildCsvExport, type ExportFormat } from '@/lib/ui/exports'
 
 // Carte Résultat (Story 4.3, FR12 ; timeline Story 5.3 ; ROUE Story 5.4, FR16/UX-DR9 ; DEUX MODES
 // Story 5.5, FR16/axe A). UI pure : tout passe par le store (AD-11). 4.3 met en FORME le résultat
@@ -33,6 +34,10 @@ import { formatDateFr } from '@/lib/format/date-fr'
 // après rechargement / depuis un autre poste. Seuls l'ANIMATION (`spinNonce`/`busy`/halo/`revealMessage`)
 // et le curseur d'animation local restent éphémères ; ce dernier s'initialise depuis le curseur persisté
 // et est repoussé au store aux points de contrôle. Le gel microcopie/branding (favicon) reste à 5.8.
+// EXPORTS (Story 5.7, FR17/UX-DR11) : sous la timeline, une barre « Partager » ouvre un aperçu monospace
+// du contenu EXACT (Slack markdown / CSV ISO) construit par le cœur pur `lib/ui/exports.ts`, copiable via
+// `navigator.clipboard` (repli silencieux) + toast. 100 % client/lecture seule (aucune écriture serveur).
+// Lien public & .ics restent HORS périmètre (différés).
 
 export function ScheduleResult() {
   const {
@@ -67,6 +72,11 @@ export function ScheduleResult() {
   // ajustable pendant le rendu via le pattern « ajuster l'état pendant le rendu »).
   const [autoSpin, setAutoSpin] = useState(false)
 
+  // Export (Story 5.7) : format affiché dans l'aperçu (`null` = panneau fermé) + toast transitoire.
+  const [exportFmt, setExportFmt] = useState<ExportFormat | null>(null)
+  const [toastMsg, setToastMsg] = useState('')
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const planningLen = schedule?.planning.length ?? 0
   // Contrat couleur partagé 5.3 : index = position dans les ACTIFS (ordre du store). Réutilisé tel quel.
   // Mémoïsé pour ne pas recalculer/redessiner à chaque rendu (stable tant que schedule/participants ne
@@ -88,6 +98,8 @@ export function ScheduleResult() {
     setBusy(false)
     setJustRevealedDate(null)
     setRevealMessage('')
+    // Story 5.7 : un aperçu d'export d'un ancien planning ne doit pas survivre à un nouveau tirage.
+    setExportFmt(null)
     if (autoSpin && schedule && schedule.planning.length > 0) {
       setAutoSpin(false)
       setBusy(true)
@@ -105,11 +117,12 @@ export function ScheduleResult() {
     setRevealedCount(safeRevealed)
   }
 
-  // Nettoyage des minuteurs (halo + enchaînement) au démontage.
+  // Nettoyage des minuteurs (halo + enchaînement + toast) au démontage.
   useEffect(
     () => () => {
       if (justPickedTimer.current) clearTimeout(justPickedTimer.current)
       if (chainTimer.current) clearTimeout(chainTimer.current)
+      if (toastTimer.current) clearTimeout(toastTimer.current)
     },
     [],
   )
@@ -212,6 +225,47 @@ export function ScheduleResult() {
     [schedule, mode, persistRotationCursor],
   )
 
+  // ── Exports (Story 5.7, FR17/UX-DR11) ────────────────────────────────────────
+  // Contenu EXACT de l'aperçu = la chaîne qui SERA copiée (source UNIQUE, partagée par le <pre> et
+  // `copyExport`). Planning COMPLET (« un planning généré ») dès qu'une rotation est tirée. Mémoïsé.
+  const previewContent = useMemo(() => {
+    if (!exportFmt || !schedule) return ''
+    return exportFmt === 'slack' ? buildSlackExport(schedule.planning) : buildCsvExport(schedule.planning)
+  }, [exportFmt, schedule])
+
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToastMsg(''), 2600)
+  }, [])
+
+  // Ouvre l'aperçu d'un format. Garde-fou (AC-6) : sans rotation tirée → toast « Lance d'abord la rotation ».
+  const openExport = useCallback(
+    (fmt: ExportFormat) => {
+      if (!schedule || schedule.planning.length === 0) {
+        showToast("Lance d'abord la rotation")
+        return
+      }
+      setExportFmt(fmt)
+    },
+    [schedule, showToast],
+  )
+
+  const closeExport = useCallback(() => setExportFmt(null), [])
+
+  // Copie via le presse-papier avec REPLI SILENCIEUX (AC-5) : `navigator.clipboard` n'existe qu'en contexte
+  // sécurisé (https/localhost) ; absence ou promesse rejetée → aucune erreur, aucun crash. Toast au succès.
+  const copyExport = useCallback(() => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard
+        .writeText(previewContent)
+        .then(() => showToast('Copié dans le presse-papier'))
+        .catch(() => {
+          /* presse-papier indisponible : repli silencieux. */
+        })
+    }
+  }, [previewContent, showToast])
+
   // Bloc d'avertissement « non planifiés » : raison GÉNÉRIQUE collective (pas de cause par personne —
   // le domaine renvoie {id,name}, et recalculer la cause côté UI dupliquerait isPersonUnavailable /
   // isTeamNonSessionDay hors du domaine, ce qu'AD-1/AD-3 interdisent). Réutilisé dans deux états.
@@ -302,6 +356,45 @@ export function ScheduleResult() {
 
           <ScheduleTimeline revealedCount={revealedCount} justRevealedDate={justRevealedDate} />
 
+          {/* Barre d'export (Story 5.7) : Slack + CSV uniquement (lien public & .ics HORS périmètre). */}
+          <div className="export-row">
+            <span className="lead">Partager&nbsp;:</span>
+            <button
+              type="button"
+              className={exportFmt === 'slack' ? 'mini active' : 'mini'}
+              aria-pressed={exportFmt === 'slack'}
+              onClick={() => openExport('slack')}
+            >
+              💬 Pour Slack
+            </button>
+            <button
+              type="button"
+              className={exportFmt === 'csv' ? 'mini active' : 'mini'}
+              aria-pressed={exportFmt === 'csv'}
+              onClick={() => openExport('csv')}
+            >
+              ⬇ En CSV
+            </button>
+          </div>
+
+          {/* Aperçu : contenu EXACT en monospace (UX-DR11). `previewContent` est la source unique copiée. */}
+          <div className={exportFmt ? 'export-preview show' : 'export-preview'}>
+            <div className="ep-head">
+              <span className="fmt">
+                {exportFmt === 'slack' ? 'Message Slack' : 'Fichier rotation.csv'}
+              </span>
+              <span className="ep-hint">— exactement ce qui est copié</span>
+              <span className="spacer" />
+              <button type="button" className="mini" onClick={copyExport}>
+                📋 Copier
+              </button>
+              <button type="button" className="ep-x" aria-label="Fermer l'aperçu" onClick={closeExport}>
+                ✕
+              </button>
+            </div>
+            <pre className="ep-body">{previewContent}</pre>
+          </div>
+
           {unscheduledWarning}
         </div>
       ) : schedule.unscheduled.length > 0 ? (
@@ -311,6 +404,15 @@ export function ScheduleResult() {
         </div>
       ) : (
         <p className="card-empty">Aucun participant n&apos;a pu être planifié.</p>
+      )}
+
+      {/* Toast transitoire (Story 5.7) : confirmation de copie / garde-fou export. Région live distincte. */}
+      {toastMsg && (
+        <div className="toasts">
+          <div className="toast" role="status" aria-live="polite">
+            {toastMsg}
+          </div>
+        </div>
       )}
     </div>
   )
