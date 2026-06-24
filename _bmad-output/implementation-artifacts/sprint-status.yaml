@@ -92,6 +92,8 @@ story_location: _bmad-output/implementation-artifacts
 # 2026-06-24 — Story 5.5 contextée (Amelia/create-story) : backlog → ready-for-dev (epic-5 déjà in-progress ; UI PURE — sélecteur tablist 2 modes « Rotation complète »/« Jour le jour », enchaînement auto ~600 ms vs 1 clic = 1 jour, libellés CTA évolutifs au mot près, reset au changement de mode, reduced-motion 2 modes ; cœur pur testable extrait lib/ui/spin-mode.ts, aucun test composant React → contrôle navigateur en passe humaine ; domaine/wheel/timeline/SpinWheel/golden INTACTS ; défaut=« Rotation complète » par UX autoritaire ; persistance 5.6 / exports 5.7 / gel microcopie+branding 5.8 / popover+nudge 5.9 différés).
 # 2026-06-24 — Story 5.5 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
 # 2026-06-24 — Story 5.5 implémentée (Amelia/dev-story) : in-progress → review (sélecteur tablist 2 modes + nav clavier ←/→, enchaînement auto ~600 ms vs 1 clic = 1 jour, libellés CTA évolutifs via cœur pur lib/ui/spin-mode.ts, reset au changement de mode, reduced-motion option A ; +14 tests ; domaine/wheel/timeline/SpinWheel/golden INTACTS ; tsc 0/eslint 0/296 tests unitaires/build OK ; contrôle navigateur recommandé en passe humaine).
+# 2026-06-24 — Story 5.6 implémentée (Amelia/dev-story) : in-progress → review. Persistance SERVEUR via table singleton `rotation_state` (graine nullable + curseur + mode) ; proxy passphrase `/api/rotation_state` (op upsert, AD-14) ; data/reducer/reconcile calqués 1:1 sur `settings` ; 7ᵉ abonnement Realtime (recalcul du schedule sur changement de graine) ; reprise au montage par recalcul déterministe (NFR7, jamais figé) ; curseur/mode levés dans le store, lus par ScheduleResult (orchestration 5.5 INTACTE) ; granularité maîtrisée (jour-le-jour=chaque révélation, complète=curseur final) ; garde clampCursor ; dégradation gracieuse si migration absente. +24 tests (9 rejouabilité + 15 reducer) ; tsc 0 / eslint 0 / 320 tests unitaires / build OK. Domaine/wheel/timeline/spin-mode/SpinWheel/golden INTACTS. À FAIRE en passe humaine : appliquer la migration (supabase db push) + contrôle navigateur (reprise reload/2ᵉ navigateur, prompt passphrase).
+# 2026-06-24 — Story 5.6 contextée (Amelia/create-story) : backlog → ready-for-dev (epic-5 déjà in-progress). FLAG ARCHI #2 TRANCHÉ : persistance SERVEUR Supabase via table singleton dédiée `rotation_state` (proxy passphrase AD-14, lecture low-privilege + Realtime AD-6/AD-15, LWW AD-16) — état local REJETÉ (AC-1 exige la reprise multi-navigateur). Persiste graine+curseur(+mode), recalcul déterministe NFR7 ; jamais de planning figé. Périmètre TRANSVERSE (migration + route + lib/data + reducer + reconcile + store + page + ScheduleResult) calqué 1:1 sur le patron `settings`. Domaine/wheel/timeline/spin-mode/SpinWheel/golden INTACTS ; orchestration 5.5 préservée. 3 questions ouvertes (table dédiée vs colonnes settings ; passphrase à la révélation ; scope « complète » vs « jour le jour ») → valider avec Solo/architecte avant dev-story.
 
 development_status:
   epic-1: in-progress
@@ -122,7 +124,7 @@ development_status:
   5-3-timeline-visuelle-grille-multi-lignes-sans-scrollbar: review
   5-4-roue-animee-theatre-revelation-resultat-edf: review
   5-5-deux-modes-rotation-complete-jour-le-jour: review
-  5-6-persistance-rotation-mode-jour-le-jour: backlog
+  5-6-persistance-rotation-mode-jour-le-jour: review
   5-7-exports-slack-csv-avec-apercu: backlog
   5-8-microcopie-branding-accessibilite-mouvement: backlog
   5-9-navigation-edition-rapide-entre-etapes: backlog

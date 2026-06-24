@@ -4,6 +4,7 @@ import { fetchGroupExclusions, type GroupExclusion } from '@/lib/data/group-excl
 import { fetchHolidays, type Holiday } from '@/lib/data/holidays'
 import { fetchTeamOffDays, type TeamOffDay } from '@/lib/data/team-off-days'
 import { fetchSettings, type Setting } from '@/lib/data/settings'
+import { fetchRotationState, type RotationState } from '@/lib/data/rotation-state'
 import { ParticipantsStoreProvider } from '@/lib/store/participants-store'
 import { ParticipantsCard } from '@/components/ParticipantsCard'
 import { GenerationOptions } from '@/components/GenerationOptions'
@@ -20,8 +21,8 @@ export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   // SSR de l'état initial → passé au provider client (pas de flash de chargement).
-  // Les cinq fetchs en parallèle, INDÉPENDANTS : l'échec de l'un retombe sur [] sans perdre les autres
-  // (Realtime + re-hydratation AD-6 prennent le relais).
+  // Les sept fetchs en parallèle, INDÉPENDANTS : l'échec de l'un retombe sur []/null sans perdre les
+  // autres (Realtime + re-hydratation AD-6 prennent le relais). rotation_state (5.6) = reprise au curseur.
   const [
     initial,
     initialUnavailabilities,
@@ -29,6 +30,7 @@ export default async function Home() {
     initialHolidays,
     initialTeamOffDays,
     initialSettings,
+    initialRotationState,
   ] = await Promise.all([
     fetchParticipants().catch((): Participant[] => []),
     fetchUnavailabilities().catch((): Unavailability[] => []),
@@ -36,6 +38,7 @@ export default async function Home() {
     fetchHolidays().catch((): Holiday[] => []),
     fetchTeamOffDays().catch((): TeamOffDay[] => []),
     fetchSettings().catch((): Setting | null => null),
+    fetchRotationState().catch((): RotationState | null => null),
   ])
 
   return (
@@ -47,6 +50,7 @@ export default async function Home() {
       initialHolidays={initialHolidays}
       initialTeamOffDays={initialTeamOffDays}
       initialSettings={initialSettings}
+      initialRotationState={initialRotationState}
     >
       <header className="app-header">
         <div className="app-header-icon" aria-hidden="true">

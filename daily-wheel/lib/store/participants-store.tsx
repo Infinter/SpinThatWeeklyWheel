@@ -34,6 +34,13 @@ import {
   type Setting,
   type SettingWritePayload,
 } from '@/lib/data/settings'
+import {
+  fetchRotationState,
+  writeRotationState,
+  type RotationState,
+  type RotationStateWritePayload,
+  type SpinMode,
+} from '@/lib/data/rotation-state'
 import { type ChangeEvent } from '@/lib/store/reconcile'
 import { participantsReducer, type StoreParticipant } from '@/lib/store/participants-reducer'
 import { unavailabilitiesReducer, type StoreUnavailability } from '@/lib/store/unavailabilities-reducer'
@@ -41,6 +48,11 @@ import { groupExclusionsReducer, type StoreGroupExclusion } from '@/lib/store/gr
 import { holidaysReducer, type StoreHoliday } from '@/lib/store/holidays-reducer'
 import { teamOffDaysReducer, type StoreTeamOffDay } from '@/lib/store/team-off-days-reducer'
 import { settingsReducer, DEFAULT_SETTING, type StoreSetting } from '@/lib/store/settings-reducer'
+import {
+  rotationStateReducer,
+  DEFAULT_ROTATION_STATE,
+  type StoreRotationState,
+} from '@/lib/store/rotation-state-reducer'
 import { isValidRange, isDuplicateDay, type DayOrRange } from '@/lib/domain/availability'
 import { isValidEveryN, refDateMatchesDayOfWeek } from '@/lib/domain/team-availability'
 import {
@@ -94,6 +106,44 @@ function toServerTeamOffDay(o: StoreTeamOffDay): TeamOffDay {
 function toServerSetting(s: StoreSetting): Setting {
   return { id: s.id, skip_weekends: s.skip_weekends, start_date: s.start_date, updated_at: s.updated_at }
 }
+// Snapshot rotation_state (sans pending/failed) pour les rollbacks RESTORE (Story 5.6).
+function toServerRotationState(r: StoreRotationState): RotationState {
+  return { id: r.id, seed: r.seed, cursor: r.cursor, mode: r.mode, updated_at: r.updated_at }
+}
+
+// Assemble l'entrée du domaine (actifs + indispos + contraintes d'équipe + date de début) depuis les
+// slices du store. EXTRAIT (Story 5.6) pour être réutilisé par `generate()` (nouveau tirage) ET par la
+// reprise au montage / la re-synchro Realtime (recalcul déterministe depuis la graine persistée). PUR.
+function buildScheduleInput(
+  participants: StoreParticipant[],
+  unavailabilities: StoreUnavailability[],
+  groupExclusions: StoreGroupExclusion[],
+  holidays: StoreHoliday[],
+  teamOffDays: StoreTeamOffDay[],
+  settings: StoreSetting,
+): ScheduleInput {
+  const actives = participants.filter((p) => p.active === true)
+  return {
+    participants: actives.map((p) => ({
+      id: p.id,
+      name: p.name,
+      unavailabilities: unavailabilities
+        .filter((u) => u.participant_id === p.id)
+        .map((u) => ({ kind: u.kind, date1: u.date1, date2: u.date2 })),
+    })),
+    constraints: {
+      skipWeekends: settings.skip_weekends,
+      groupExclusions: groupExclusions.map((g) => ({
+        day_of_week: g.day_of_week,
+        every_n: g.every_n,
+        ref_date: g.ref_date,
+      })),
+      holidays: holidays.map((h) => ({ date: h.date })),
+      teamOffDays: teamOffDays.map((o) => ({ kind: o.kind, date1: o.date1, date2: o.date2 })),
+    },
+    startDate: settings.start_date ?? todayYMD(),
+  }
+}
 
 // Forme « optionnelle » des inputs d'une indispo, telle que fournie par l'UI.
 type UnavailabilityInput = { kind: 'day' | 'range'; date1: string; date2: string | null }
@@ -135,10 +185,18 @@ type StoreValue = {
   setSkipWeekends: (value: boolean) => void
   setStartDate: (date: string) => void
   retrySettings: () => void
-  // Résultat de génération ÉPHÉMÈRE (Story 4.2) — calcul client pur, NON persisté (ni table, ni
-  // Realtime, ni écriture). `null` tant qu'aucune génération n'a été lancée. Recalculé à chaque clic.
+  // Résultat de génération (Story 4.2 ; PERSISTANT depuis 5.6). Calcul client pur RECALCULÉ depuis la
+  // graine persistée (jamais sérialisé en base — AC-2). `null` tant qu'aucune rotation n'a été tirée.
   schedule: ScheduleResult | null
   generate: () => void
+  // Rotation persistée (Story 5.6, FR18) : curseur de révélation + mode, reflétés depuis rotation_state
+  // (source canonique Supabase, AD-4). Le composant Spin LIT ces valeurs pour reprendre au bon jour.
+  rotationCursor: number
+  rotationMode: SpinMode
+  // Persiste le curseur (jour-le-jour : à chaque révélation ; rotation complète : curseur final) — AC-4/6/7.
+  persistRotationCursor: (cursor: number) => void
+  // Persiste le mode ET remet le curseur à 0 (changement de mode = reset, cohérent 5.5 AC-6).
+  persistRotationMode: (mode: SpinMode) => void
   error: string | null
   clearError: () => void
   passphraseNeeded: boolean
@@ -158,6 +216,7 @@ export function ParticipantsStoreProvider({
   initialHolidays,
   initialTeamOffDays,
   initialSettings,
+  initialRotationState,
   children,
 }: {
   initial: Participant[]
@@ -166,6 +225,7 @@ export function ParticipantsStoreProvider({
   initialHolidays: Holiday[]
   initialTeamOffDays: TeamOffDay[]
   initialSettings: Setting | null
+  initialRotationState: RotationState | null
   children: ReactNode
 }) {
   const [participants, dispatch] = useReducer(participantsReducer, initial as StoreParticipant[])
@@ -186,9 +246,31 @@ export function ParticipantsStoreProvider({
     settingsReducer,
     (initialSettings ?? DEFAULT_SETTING) as StoreSetting,
   )
+  // Rotation persistée (Story 5.6) : ligne 'singleton' (graine + curseur + mode). Hydratée en SSR.
+  const [rotationState, dispatchR] = useReducer(
+    rotationStateReducer,
+    (initialRotationState ?? DEFAULT_ROTATION_STATE) as StoreRotationState,
+  )
   const [error, setError] = useState<string | null>(null)
-  // Résultat de génération ÉPHÉMÈRE (Story 4.2) : calcul client pur, jamais persisté ni hydraté.
-  const [schedule, setSchedule] = useState<ScheduleResult | null>(null)
+  // Résultat de génération (Story 4.2 ; PERSISTANT depuis 5.6). REPRISE au montage : si une graine est
+  // persistée (seed != null), on RECALCULE le planning à l'identique (déterminisme NFR7) depuis les
+  // entrées initiales — jamais un planning figé (AC-2). Sinon `null` (aucune rotation tirée). Lazy
+  // initializer (pur, idempotent SSR/client tant que les entrées et la graine sont stables).
+  const [schedule, setSchedule] = useState<ScheduleResult | null>(() =>
+    initialRotationState && initialRotationState.seed != null
+      ? generateSchedule(
+          buildScheduleInput(
+            initial as StoreParticipant[],
+            initialUnavailabilities as StoreUnavailability[],
+            initialGroupExclusions as StoreGroupExclusion[],
+            initialHolidays as StoreHoliday[],
+            initialTeamOffDays as StoreTeamOffDay[],
+            (initialSettings ?? DEFAULT_SETTING) as StoreSetting,
+          ),
+          createRng(initialRotationState.seed),
+        )
+      : null,
+  )
 
   // File d'écriture partagée + passphrase (extraite en 3.2). TABLE-AGNOSTIQUE : un seul prompt pour N (AD-8).
   const { runWrite, retry, passphraseNeeded, submitPassphrase, cancelPassphrase, unlocked } =
@@ -206,6 +288,7 @@ export function ParticipantsStoreProvider({
   const stateRefH = useRef(holidays)
   const stateRefO = useRef(teamOffDays)
   const stateRefS = useRef(settings)
+  const stateRefR = useRef(rotationState)
   useEffect(() => {
     stateRef.current = participants
   }, [participants])
@@ -224,6 +307,9 @@ export function ParticipantsStoreProvider({
   useEffect(() => {
     stateRefS.current = settings
   }, [settings])
+  useEffect(() => {
+    stateRefR.current = rotationState
+  }, [rotationState])
 
   // ── Participants ────────────────────────────────────────────────────────────
   // Chemin INTERNE par nom : crée une ligne optimiste + déclenche l'insert (réutilisé par addParticipants).
@@ -647,36 +733,72 @@ export function ParticipantsStoreProvider({
   )
   const retrySettings = useCallback(() => retry('settings'), [retry])
 
-  // ── Génération du planning (Story 4.2, FR11/FR14) ──────────────────────────────
-  // Calcul client PUR et ÉPHÉMÈRE : assemble l'entrée du domaine (actifs + leurs indispos + contraintes
-  // d'équipe + date de début), tire un seed ALÉATOIRE (Math.random AUTORISÉ ici — hors de la feuille
-  // domaine, AD-2), appelle `generateSchedule` et pose le résultat dans le state. Aucune persistance :
-  // pas d'écriture, pas de Realtime, pas de réconciliation. Un rechargement efface le résultat (attendu).
+  // ── Rotation persistée (Story 5.6, FR18, flag archi #2) — patron SCALAIRE / upsert ────────────
+  // Persiste (graine + curseur + mode) en base via le proxy gardé par passphrase (AD-7/AD-8/AD-14),
+  // optimiste (AD-5) via la file partagée (un seul prompt — AD-8), réconcilié par Realtime (AD-15/AD-16).
+  // Calqué EXACTEMENT sur `updateSettings`. On persiste un mécanisme REPRODUCTIBLE, jamais le planning.
+  const updateRotationState = useCallback(
+    (patch: RotationStateWritePayload) => {
+      const snapshot = toServerRotationState(stateRefR.current)
+      dispatchR({ type: 'OPTIMISTIC', patch })
+      void runWrite({
+        write: (pp) => writeRotationState(patch, pp),
+        onConfirm: (r) => dispatchR({ type: 'CONFIRM', row: r as RotationState }),
+        onFailed: () => dispatchR({ type: 'MARK_FAILED' }),
+        rollback: () => dispatchR({ type: 'RESTORE', row: snapshot }),
+        onConflictRehydrate: async () => {
+          try {
+            dispatchR({ type: 'HYDRATE', row: await fetchRotationState() })
+          } catch {
+            /* Realtime prendra le relais. */
+          }
+        },
+        retryKey: 'rotation_state',
+      })
+    },
+    [runWrite],
+  )
+
+  // Persiste le curseur de révélation (AC-4/AC-6/AC-7). Appelé par le composant Spin : en « Jour le jour »
+  // à CHAQUE révélation ; en « Rotation complète » UNE SEULE fois au curseur final (granularité — pas par
+  // frame). La graine et le mode ne changent pas ici.
+  const persistRotationCursor = useCallback(
+    (cursor: number) => updateRotationState({ cursor }),
+    [updateRotationState],
+  )
+
+  // Persiste le mode ET remet le curseur à 0 (changement de mode = reset propre, cohérent 5.5 AC-6).
+  const persistRotationMode = useCallback(
+    (mode: SpinMode) => updateRotationState({ mode, cursor: 0 }),
+    [updateRotationState],
+  )
+
+  // ── Génération du planning (Story 4.2, FR11/FR14 ; PERSISTANT depuis 5.6) ──────────────────────
+  // Calcul client PUR : assemble l'entrée du domaine (buildScheduleInput), tire un seed ALÉATOIRE
+  // (Math.random AUTORISÉ ici — hors de la feuille domaine, AD-2), appelle `generateSchedule`, pose le
+  // résultat, ET PERSISTE la graine + curseur 0 (Story 5.6) : un (re)tirage repart de zéro côté serveur,
+  // ce qui permet la reprise au rechargement / depuis un autre poste. Le mode courant n'est pas touché.
   const generate = useCallback(() => {
-    const actives = participants.filter((p) => p.active === true)
-    const input: ScheduleInput = {
-      participants: actives.map((p) => ({
-        id: p.id,
-        name: p.name,
-        unavailabilities: unavailabilities
-          .filter((u) => u.participant_id === p.id)
-          .map((u) => ({ kind: u.kind, date1: u.date1, date2: u.date2 })),
-      })),
-      constraints: {
-        skipWeekends: settings.skip_weekends,
-        groupExclusions: groupExclusions.map((g) => ({
-          day_of_week: g.day_of_week,
-          every_n: g.every_n,
-          ref_date: g.ref_date,
-        })),
-        holidays: holidays.map((h) => ({ date: h.date })),
-        teamOffDays: teamOffDays.map((o) => ({ kind: o.kind, date1: o.date1, date2: o.date2 })),
-      },
-      startDate: settings.start_date ?? todayYMD(),
-    }
+    const input = buildScheduleInput(
+      participants,
+      unavailabilities,
+      groupExclusions,
+      holidays,
+      teamOffDays,
+      settings,
+    )
     const seed = Math.floor(Math.random() * 0x100000000)
     setSchedule(generateSchedule(input, createRng(seed)))
-  }, [participants, unavailabilities, groupExclusions, holidays, teamOffDays, settings])
+    updateRotationState({ seed, cursor: 0 })
+  }, [
+    participants,
+    unavailabilities,
+    groupExclusions,
+    holidays,
+    teamOffDays,
+    settings,
+    updateRotationState,
+  ])
 
   const clearError = useCallback(() => setError(null), [])
 
@@ -844,6 +966,63 @@ export function ParticipantsStoreProvider({
     }
   }, [])
 
+  // ── 7ᵉ abonnement Realtime : rotation_state (Story 5.6, AD-6) — ligne unique 'singleton' ──
+  // Synchro inter-clients de la rotation : si un poste (re)lance ou avance le curseur, l'autre le voit.
+  useEffect(() => {
+    // Recalcule le planning depuis une graine (déterminisme NFR7) en lisant les entrées COURANTES via
+    // les refs miroir (toujours à jour, hors closure). Utilisé à l'abonnement et sur changement de graine.
+    const recomputeFromSeed = (seed: number | null | undefined) => {
+      if (seed == null) return
+      setSchedule(
+        generateSchedule(
+          buildScheduleInput(
+            stateRef.current,
+            stateRefU.current,
+            stateRefG.current,
+            stateRefH.current,
+            stateRefO.current,
+            stateRefS.current,
+          ),
+          createRng(seed),
+        ),
+      )
+    }
+    const channel = supabasePublic
+      .channel('rotation-state-rt')
+      .on<RotationState>(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'rotation_state' },
+        (payload) => {
+          const event = mapChange<RotationState>(payload)
+          if (!event) return
+          const prevSeed = stateRefR.current.seed
+          dispatchR({ type: 'REALTIME', event })
+          // Recalcul UNIQUEMENT si la GRAINE change (un autre poste a (re)lancé) : un écho de curseur/mode
+          // garde la même graine → on NE recalcule PAS (sinon on réinitialiserait la vue locale à tort).
+          if (event.eventType !== 'DELETE' && event.new?.seed != null && event.new.seed !== prevSeed) {
+            recomputeFromSeed(event.new.seed)
+          }
+        },
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          fetchRotationState()
+            .then((row) => {
+              const prevSeed = stateRefR.current.seed
+              dispatchR({ type: 'HYDRATE', row })
+              if (row?.seed != null && row.seed !== prevSeed) recomputeFromSeed(row.seed)
+            })
+            .catch(() => {
+              /* refetch impossible : un prochain SUBSCRIBED réessaiera. */
+            })
+        }
+      })
+
+    return () => {
+      void supabasePublic.removeChannel(channel)
+    }
+  }, [])
+
   const value: StoreValue = {
     participants,
     addParticipants,
@@ -873,6 +1052,10 @@ export function ParticipantsStoreProvider({
     retrySettings,
     schedule,
     generate,
+    rotationCursor: rotationState.cursor,
+    rotationMode: rotationState.mode,
+    persistRotationCursor,
+    persistRotationMode,
     error,
     clearError,
     passphraseNeeded,

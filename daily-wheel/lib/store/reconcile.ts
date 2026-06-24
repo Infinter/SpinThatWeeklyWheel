@@ -4,6 +4,7 @@ import type { GroupExclusion } from '@/lib/data/group-exclusions'
 import type { Holiday } from '@/lib/data/holidays'
 import type { TeamOffDay } from '@/lib/data/team-off-days'
 import type { Setting } from '@/lib/data/settings'
+import type { RotationState } from '@/lib/data/rotation-state'
 
 // Réducteur de réconciliation PUR (Story 1.5, AC1/AC10 ; généralisé en Story 2.3, AC4).
 // Applique un événement Realtime `postgres_changes` à la copie de travail locale
@@ -109,6 +110,28 @@ export type SettingChangeEvent = ChangeEvent<Setting>
 
 export function reconcileSetting(state: Setting, event: SettingChangeEvent): Setting {
   // settings n'est jamais supprimé → un DELETE éventuel est ignoré (on garde l'état courant).
+  if (event.eventType === 'DELETE') return state
+  const incoming = event.new
+  if (!incoming || incoming.id !== 'singleton') return state
+  // AD-15 : même updated_at → écho de notre propre écriture, déjà appliqué → ignorer.
+  if (state.updated_at === incoming.updated_at) return state
+  // AD-16 : Last-Write-Wins. L'entrant n'écrase que s'il est strictement plus récent.
+  if (incoming.updated_at < state.updated_at) return state
+  return incoming
+}
+
+// ── Réconciliation SCALAIRE de rotation_state (Story 5.6) ─────────────────────
+// `rotation_state` est une LIGNE UNIQUE (id='singleton'), comme `settings` → patron identique à
+// `reconcileSetting`. Mêmes invariants AD-15 (dédup écho par `updated_at`) / AD-16 (LWW serveur).
+// Permet la synchro Realtime entre clients : si un poste relance la rotation (nouvelle graine/curseur),
+// l'autre la voit via l'écho (le store recalcule alors le `schedule` depuis la graine reçue).
+export type RotationStateChangeEvent = ChangeEvent<RotationState>
+
+export function reconcileRotationState(
+  state: RotationState,
+  event: RotationStateChangeEvent,
+): RotationState {
+  // rotation_state n'est jamais supprimé → un DELETE éventuel est ignoré (on garde l'état courant).
   if (event.eventType === 'DELETE') return state
   const incoming = event.new
   if (!incoming || incoming.id !== 'singleton') return state

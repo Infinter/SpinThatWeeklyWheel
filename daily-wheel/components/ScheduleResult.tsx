@@ -6,6 +6,7 @@ import { ScheduleTimeline } from '@/components/ScheduleTimeline'
 import { SpinWheel } from '@/components/SpinWheel'
 import { buildWheelSegments } from '@/lib/ui/wheel'
 import { buildColorIndexMap } from '@/lib/ui/participant-colors'
+import { clampCursor } from '@/lib/ui/rotation-resume'
 import {
   CHAIN_DELAY_MS,
   ctaLabelFor,
@@ -26,22 +27,35 @@ import { formatDateFr } from '@/lib/format/date-fr'
 //   - « Jour le jour » : un clic révèle un seul jour, le CTA évoluant « premier » → « suivant » → « ✓ ».
 //
 // PRINCIPE DIRECTEUR (UX-DR9) : `generateSchedule` est la source de vérité ; la roue ne fait que RÉVÉLER
-// le résultat (animation ≡ planning). L'état de révélation reste LOCAL et éphémère (la persistance « jour
-// le jour » est l'objet de 5.6). Les libellés/booléens du CTA viennent du cœur pur `lib/ui/spin-mode.ts`.
-// Le gel final de la microcopie/branding (favicon, titres contextuels) reste à 5.8.
+// le résultat (animation ≡ planning). Les libellés/booléens du CTA viennent du cœur pur `lib/ui/spin-mode.ts`.
+// PERSISTANCE (Story 5.6) : le MODE et le CURSEUR de révélation sont désormais PERSISTÉS dans le store
+// (table `rotation_state`, source canonique Supabase) → la rotation « Jour le jour » reprend au bon jour
+// après rechargement / depuis un autre poste. Seuls l'ANIMATION (`spinNonce`/`busy`/halo/`revealMessage`)
+// et le curseur d'animation local restent éphémères ; ce dernier s'initialise depuis le curseur persisté
+// et est repoussé au store aux points de contrôle. Le gel microcopie/branding (favicon) reste à 5.8.
 
 export function ScheduleResult() {
-  const { schedule, generate, participants } = useParticipants()
+  const {
+    schedule,
+    generate,
+    participants,
+    rotationCursor,
+    rotationMode,
+    persistRotationCursor,
+    persistRotationMode,
+  } = useParticipants()
   const activeCount = participants.filter((p) => p.active).length
   const canGenerate = activeCount > 0
 
-  // Mode de révélation (Story 5.5). Défaut = « Rotation complète » (spec UX autoritaire, mockup:295).
-  const [mode, setMode] = useState<SpinMode>('rotation-complete')
+  // Mode de révélation (Story 5.5) — PERSISTÉ depuis 5.6 : lu depuis le store (défaut « Rotation
+  // complète », mockup:295). Alias local en lecture seule ; toute bascule passe par `persistRotationMode`.
+  const mode = rotationMode
 
-  // État de révélation (local, éphémère). `spinNonce` : toute incrémentation déclenche un spin dans la
-  // roue. `busy` : une animation/un enchaînement est en cours (CTA désactivé + aria-busy). `justRevealedDate`
-  // : cellule à animer (pop/halo). `revealMessage` : annonce de la région live.
-  const [revealedCount, setRevealedCount] = useState(0)
+  // Curseur d'animation LOCAL : initialisé depuis le curseur PERSISTÉ (reprise au montage, AC-1), puis
+  // repoussé au store aux points de contrôle (cf. handleRevealed). `spinNonce` : toute incrémentation
+  // déclenche un spin. `busy` : animation/enchaînement en cours (CTA désactivé). `justRevealedDate` :
+  // cellule à animer (pop/halo). `revealMessage` : annonce de la région live.
+  const [revealedCount, setRevealedCount] = useState(() => rotationCursor)
   const [spinNonce, setSpinNonce] = useState(0)
   const [busy, setBusy] = useState(false)
   const [justRevealedDate, setJustRevealedDate] = useState<string | null>(null)
@@ -83,6 +97,14 @@ export function ScheduleResult() {
     }
   }
 
+  // Garde-fou de REPRISE (Story 5.6) : un curseur persisté devenu incohérent (entrées changées entre
+  // deux sessions → planning plus court — relève de 5.9) est BORNÉ pour ne jamais déborder roue/timeline.
+  // Pattern « ajuster pendant le rendu » (idempotent : une fois borné, la condition est fausse).
+  const safeRevealed = clampCursor(revealedCount, planningLen)
+  if (schedule && safeRevealed !== revealedCount) {
+    setRevealedCount(safeRevealed)
+  }
+
   // Nettoyage des minuteurs (halo + enchaînement) au démontage.
   useEffect(
     () => () => {
@@ -111,14 +133,16 @@ export function ScheduleResult() {
     }
   }, [])
 
-  // Changement de mode (AC-6) : bascule + reset propre. Aucun `generate()` (le plan reste).
+  // Changement de mode (5.5 AC-6 ; PERSISTÉ 5.6) : bascule + reset propre. Aucun `generate()` (le plan
+  // reste). `persistRotationMode` met à jour le store (mode + curseur 0) et persiste ; `resetReveal`
+  // remet l'ANIMATION locale à zéro (curseur local, timers, halo, message).
   const switchMode = useCallback(
     (next: SpinMode) => {
       if (next === mode) return
-      setMode(next)
+      persistRotationMode(next)
       resetReveal()
     },
-    [mode, resetReveal],
+    [mode, persistRotationMode, resetReveal],
   )
 
   // Navigation clavier du tablist (AC-2) : ←/→ basculent le mode (deux onglets ⇒ les deux flèches
@@ -167,6 +191,7 @@ export function ScheduleResult() {
       const len = schedule?.planning.length ?? 0
       if (shouldChainNext(mode, nextCount, len)) {
         // « Rotation complète » : enchaîner le jour suivant ; le CTA reste désactivé (busy inchangé).
+        // On NE persiste PAS ici (granularité, AC-7) : seul le curseur FINAL sera persisté (branche else).
         const reduced =
           typeof window !== 'undefined' &&
           typeof window.matchMedia === 'function' &&
@@ -175,12 +200,16 @@ export function ScheduleResult() {
         chainTimer.current = setTimeout(() => setSpinNonce((n) => n + 1), reduced ? 0 : CHAIN_DELAY_MS)
       } else {
         setBusy(false)
+        // Point de contrôle de PERSISTANCE (Story 5.6, AC-4/6/7) : en « Jour le jour » c'est CHAQUE
+        // révélation (le standup du jour survit) ; en « Rotation complète » c'est l'unique curseur FINAL
+        // (pas d'écriture par ~600 ms). Le curseur persisté permet la reprise au bon jour.
+        persistRotationCursor(nextCount)
         if (isRotationComplete(nextCount, len)) {
           setRevealMessage('Rotation complète ! Chacun anime une fois.')
         }
       }
     },
-    [schedule, mode],
+    [schedule, mode, persistRotationCursor],
   )
 
   // Bloc d'avertissement « non planifiés » : raison GÉNÉRIQUE collective (pas de cause par personne —
