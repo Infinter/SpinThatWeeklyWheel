@@ -41,9 +41,9 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-06-22
-last_updated: 2026-06-23
+last_updated: 2026-06-24
 project: SpinThatWeeklyWheel
-# (last_updated reflète la mise à jour Story 5.4 → review)
+# (last_updated reflète la mise à jour Story 5.5 → ready-for-dev)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
@@ -89,6 +89,9 @@ story_location: _bmad-output/implementation-artifacts
 # 2026-06-23 — Story 5.4 contextée (Amelia/create-story) : backlog → ready-for-dev (epic-5 déjà in-progress ; roue = composant pur-piloté SpinWheel + cœur géométrie/easing extrait pur lib/ui/wheel.ts, buildTimeline étendu d'un état `pending` additif/rétro-compatible ; révéler≠re-tirer UX-DR9 ; revealedCount local à ScheduleResult ; contrat couleur 5.3 réutilisé ; domaine/golden intacts ; modes/persistance/exports/microcopie différés 5.5→5.9).
 # 2026-06-23 — Story 5.4 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
 # 2026-06-23 — Story 5.4 implémentée (Amelia/dev-story) : in-progress → review (roue canvas SpinWheel + cœur pur lib/ui/wheel.ts « révèle≠tire », buildTimeline étendu pending/revealedCount rétro-compatible, ScheduleResult orchestrateur reset+auto-spin via pattern de rendu, placeholder « à tirer » + pop/halo, double garde reduced-motion ; contrat couleur 5.3 réutilisé, domaine/golden intacts 2/2 ; +20 tests, tsc 0/eslint 0/300 tests/build OK ; contrôle navigateur recommandé en passe humaine).
+# 2026-06-24 — Story 5.5 contextée (Amelia/create-story) : backlog → ready-for-dev (epic-5 déjà in-progress ; UI PURE — sélecteur tablist 2 modes « Rotation complète »/« Jour le jour », enchaînement auto ~600 ms vs 1 clic = 1 jour, libellés CTA évolutifs au mot près, reset au changement de mode, reduced-motion 2 modes ; cœur pur testable extrait lib/ui/spin-mode.ts, aucun test composant React → contrôle navigateur en passe humaine ; domaine/wheel/timeline/SpinWheel/golden INTACTS ; défaut=« Rotation complète » par UX autoritaire ; persistance 5.6 / exports 5.7 / gel microcopie+branding 5.8 / popover+nudge 5.9 différés).
+# 2026-06-24 — Story 5.5 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
+# 2026-06-24 — Story 5.5 implémentée (Amelia/dev-story) : in-progress → review (sélecteur tablist 2 modes + nav clavier ←/→, enchaînement auto ~600 ms vs 1 clic = 1 jour, libellés CTA évolutifs via cœur pur lib/ui/spin-mode.ts, reset au changement de mode, reduced-motion option A ; +14 tests ; domaine/wheel/timeline/SpinWheel/golden INTACTS ; tsc 0/eslint 0/296 tests unitaires/build OK ; contrôle navigateur recommandé en passe humaine).
 
 development_status:
   epic-1: in-progress
@@ -118,7 +121,7 @@ development_status:
   5-2-regle-rotation-horizon-etendu: review
   5-3-timeline-visuelle-grille-multi-lignes-sans-scrollbar: review
   5-4-roue-animee-theatre-revelation-resultat-edf: review
-  5-5-deux-modes-rotation-complete-jour-le-jour: backlog
+  5-5-deux-modes-rotation-complete-jour-le-jour: review
   5-6-persistance-rotation-mode-jour-le-jour: backlog
   5-7-exports-slack-csv-avec-apercu: backlog
   5-8-microcopie-branding-accessibilite-mouvement: backlog

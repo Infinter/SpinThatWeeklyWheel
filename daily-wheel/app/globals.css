@@ -808,6 +808,32 @@ button:disabled:hover { filter: none; box-shadow: none; }
 .team-off-tag button:disabled { opacity: .5; }
 .team-off-empty { font-size: .78em; color: var(--text-muted); font-style: italic; }
 
+/* ── Sélecteur de mode (Story 5.5 — « Rotation complète » / « Jour le jour », tablist) ── */
+.modes {
+  display: inline-flex;
+  background: #f1f5f9; /* piste claire (slate-100) — réplique mockup spin-rotation.html:150 */
+  border-radius: 11px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+.modes button {
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: .85rem;
+  color: var(--text-muted);
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.modes button.sel {
+  background: #fff;
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .12);
+}
+
 /* ── Résultat de génération (Story 4.3 — présentation soignée : en-tête, compteur, avertissement) ── */
 .schedule-actions {
   display: flex;
