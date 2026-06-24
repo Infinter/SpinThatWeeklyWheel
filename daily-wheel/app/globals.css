@@ -165,8 +165,9 @@ a { color: inherit; text-decoration: none; }
 }
 .step.active .lbl b { color: var(--primary); }
 
-/* Ancres de défilement : décalage sous le stepper collant pour ne pas masquer le titre (AC-3). */
-.surface-anchor { scroll-margin-top: 84px; }
+/* Commutateur d'étapes (décision Solo 2026-06-24) : seule l'étape active est visible ; les autres sont
+   masquées (montées). Sauvegarde explicite au cas où un conteneur surchargerait le `[hidden]` natif. */
+.step-panel[hidden] { display: none; }
 
 /* Focus visible homogène (UX-DR13). */
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
