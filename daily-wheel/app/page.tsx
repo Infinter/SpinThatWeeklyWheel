@@ -15,6 +15,7 @@ import { ScheduleResult } from '@/components/ScheduleResult'
 import { ProtectionBanner } from '@/components/ProtectionBanner'
 import { GuidedStepper } from '@/components/GuidedStepper'
 import { StepNavProvider, StepPanel } from '@/components/StepNav'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 // Rendu DYNAMIQUE (AC8) : l'état est live et partagé (FR13), pas de prérendu statique.
 // Les fetchs tournent aussi côté serveur (NEXT_PUBLIC_* seulement).
@@ -66,6 +67,8 @@ export default async function Home() {
         </div>
         {/* Protection annoncée d'emblée (UX-DR8) ; saisie passphrase paresseuse inchangée. */}
         <ProtectionBanner />
+        {/* Bascule clair/sombre (2026-06-24). */}
+        <ThemeToggle />
       </header>
 
       {/* Parcours guidé COLLANT : 1 Équipe · 2 Contraintes · 3 Spin. Commutateur d'étapes : une seule

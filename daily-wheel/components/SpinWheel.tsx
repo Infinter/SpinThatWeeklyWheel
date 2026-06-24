@@ -10,6 +10,7 @@ import {
   type WheelSegment,
 } from '@/lib/ui/wheel'
 import { colorForIndex } from '@/lib/ui/participant-colors'
+import { useTheme } from '@/components/theme'
 
 // Roue animée (Story 5.4, UX-DR9). Composant CLIENT « bête » : piloté par props, sans store ni domaine
 // (AD-11). Il DESSINE le résultat déjà calculé et, au spin, oriente la roue vers le segment de l'animateur
@@ -38,6 +39,7 @@ export type SpinWheelProps = {
 }
 
 export function SpinWheel({ segments, revealedCount, onRevealed, spinNonce }: SpinWheelProps) {
+  const theme = useTheme() // redessine au changement de thème (le fond du canvas suit --background)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const angleRef = useRef(0) // angle courant de la roue (persiste entre spins ; écrit en effet seulement)
   const rafRef = useRef<number | null>(null)
@@ -53,7 +55,9 @@ export function SpinWheel({ segments, revealedCount, onRevealed, spinNonce }: Sp
     if (n === 0) {
       ctx.beginPath()
       ctx.arc(CX, CY, R - 8, 0, Math.PI * 2)
-      ctx.fillStyle = '#eef4fb'
+      // Fond du disque vide = couleur de page (suit le thème clair/sombre via le token --background).
+      ctx.fillStyle =
+        getComputedStyle(document.documentElement).getPropertyValue('--background').trim() || '#eef4fb'
       ctx.fill()
       return
     }
@@ -83,7 +87,7 @@ export function SpinWheel({ segments, revealedCount, onRevealed, spinNonce }: Sp
   // Redessin (sans animation) à chaque changement d'état : montage, retrait d'un segment révélé, reset.
   useEffect(() => {
     draw(angleRef.current, remainingSegments(segments, revealedCount))
-  }, [segments, revealedCount])
+  }, [segments, revealedCount, theme])
 
   // Spin : déclenché par toute incrémentation de spinNonce (> 0). Oriente la roue vers le segment de
   // l'animateur EDF du jour courant (segments[revealedCount]) — calcul déterministe, aucun hasard.
