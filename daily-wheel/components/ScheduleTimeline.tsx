@@ -1,10 +1,11 @@
 'use client'
 
+import type { CSSProperties } from 'react'
 import { useParticipants } from '@/lib/store/participants-store'
 import { buildTimeline } from '@/lib/ui/timeline'
 import { buildColorIndexMap, colorForIndex, initialOf } from '@/lib/ui/participant-colors'
 import { isTeamOffDay, type TeamConstraints } from '@/lib/domain/team-availability'
-import { weekdayShortFr, dayOfMonth, monthShortFr } from '@/lib/format/date-fr'
+import { weekdayShortFr, dayOfMonth, monthShortFr, mondayIndex } from '@/lib/format/date-fr'
 
 // Timeline visuelle (Story 5.3, FR12 revisité, UX-DR10). Présentation PURE du planning déjà calculé :
 // remplace le tableau de 4.3 par une grille de cellules jour qui s'enroule sans scrollbar. AUCUNE
@@ -59,8 +60,19 @@ export function ScheduleTimeline({ revealedCount, justRevealedDate }: ScheduleTi
     revealedCount,
   })
 
+  // Grille calendaire (Story 5.10, affichage) : la première cellule (= premier jour rollé) est décalée à
+  // sa colonne de jour de semaine (lun→dim) via `--first-col`, exposé en variable CSS. Les jours suivants
+  // étant contigus (week-ends inclus), chaque ligne va lun→dim et le dimanche finit toujours la ligne.
+  // Sur mobile (≤520px) le CSS ignore ce décalage et reflue en empilage lisible.
+  const firstCol = mondayIndex(cells[0].date) + 1
+
   return (
-    <div className="timeline" role="list" aria-label="Planning de la rotation">
+    <div
+      className="timeline"
+      role="list"
+      aria-label="Planning de la rotation"
+      style={{ '--first-col': firstCol } as CSSProperties}
+    >
       {cells.map((cell) => {
         const justPicked = cell.kind === 'working' && cell.date === justRevealedDate
         return (

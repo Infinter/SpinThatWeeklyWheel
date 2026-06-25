@@ -876,13 +876,26 @@ button:disabled:hover { filter: none; box-shadow: none; }
 }
 
 /* ── Timeline visuelle (Story 5.3 — grille multi-lignes, sans scrollbar, UX-DR10/UX-DR13) ── */
-/* `auto-fit` + `minmax` : la grille s'enroule sur plusieurs lignes quand l'espace manque ; AUCUNE
-   scrollbar horizontale, ni desktop ni mobile (le reflux ≤520px est géré par l'algorithme lui-même). */
+/* Grille CALENDAIRE 7 colonnes (lun→dim, Story 5.10 affichage) : la première cellule est décalée à sa
+   colonne de jour de semaine via `--first-col` (posé par le composant), les jours suivants étant contigus
+   ⇒ chaque ligne va lun→dim et le dimanche finit toujours la ligne. `1fr` (sans minmax) ⇒ aucune scrollbar.
+   Mobile ≤520px : on abandonne l'alignement hebdo et on reflue en empilage lisible (auto-fit). */
 .timeline {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  grid-template-columns: repeat(7, 1fr);
   gap: 8px;
   padding: 2px 0 4px;
+}
+.timeline > .day:first-child {
+  grid-column-start: var(--first-col, 1);
+}
+@media (max-width: 520px) {
+  .timeline {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  }
+  .timeline > .day:first-child {
+    grid-column-start: auto;
+  }
 }
 .day {
   border: 1px solid var(--border);

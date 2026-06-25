@@ -32,6 +32,13 @@ export function dayOfMonth(ymd: string): string {
   return String(parseYMD(ymd).getDate())
 }
 
+// Index du jour de semaine en base LUNDI (0 = lundi … 6 = dimanche). Story 5.10 (affichage) : aligne la
+// timeline sur une grille calendaire 7 colonnes lun→dim — la première cellule est décalée à sa colonne via
+// `grid-column-start = mondayIndex + 1`. `getDay()` est dimanche-first (0 = dim) → on tourne de +6 mod 7.
+export function mondayIndex(ymd: string): number {
+  return (parseYMD(ymd).getDay() + 6) % 7
+}
+
 // Mois abrégé FR (« juin », « janv », …).
 export function monthShortFr(ymd: string): string {
   return parseYMD(ymd).toLocaleDateString('fr-FR', { month: 'short' }).replace(/\.$/, '')
