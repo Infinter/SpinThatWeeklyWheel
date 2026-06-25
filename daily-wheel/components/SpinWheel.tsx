@@ -25,7 +25,7 @@ const BACKING = 560
 const R = 280
 const CX = 280
 const CY = 280
-const DURATION_MS = 2100
+const DURATION_MS = 1200
 
 export type SpinWheelProps = {
   /** Animateurs à révéler, ordre chronologique (= buildWheelSegments(planning)). */
