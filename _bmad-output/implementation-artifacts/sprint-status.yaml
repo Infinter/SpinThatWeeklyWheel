@@ -41,13 +41,16 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-06-22
-last_updated: 2026-06-24
+last_updated: 2026-06-25
 project: SpinThatWeeklyWheel
-# (last_updated reflète la mise à jour Story 5.9 → review)
+# (last_updated reflète la création Story 5.10 → ready-for-dev)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
 
+# 2026-06-25 — Passe humaine 5.10 (Amelia, autorisée Solo) : `supabase db push` appliqué. DÉCOUVERTE : la migration rotation_state (5.6) n'avait JAMAIS été appliquée en prod (REST 404) → persistance 5.6 silencieusement KO depuis le 24/06. Push a appliqué les DEUX migrations (rotation_state + confirmed_rolls, tables absentes, aucun conflit) → 200/200. Suite complète 370/370 vert (live confirmed-rolls.write.integration inclus). RESTE : contrôle navigateur + vérifier que la reprise rotation 5.6 fonctionne enfin. Régression latente 5.6 à noter au prochain retro.
+# 2026-06-25 — Story 5.10 implémentée (Amelia/dev-story) : in-progress → review. Journal d'audit `confirmed_rolls` (écriture à la VALIDATION dans handleRevealed/bloc if(r), AVANT shouldChainNext → chaque slot révélé journalisé une fois dans les 2 modes). Cœur pur lib/ui/confirmed-roll.ts (ancre TDD rouge→vert, 9 tests : mapping participantId→participant_id + validation défensive). Migration multi-lignes PK (seed,date) SANS FK (anti-drift) SANS Realtime (write-only). Route /api/confirmed_rolls clonée de rotation_state (upsert onConflict 'seed,date', allowlist [seed,date,participant_id,name], passphrase, confirmed_at serveur). Data-access writeConfirmedRoll + fetchConfirmedRolls (tests). Store recordConfirmedRoll(row) best-effort silent, no-op si seed null (AC-8), onConfirm/rollback no-op (aucun état store). +1 test intégration write (gated env). tsc 0 / eslint 0 / 369 tests verts / build OK (9 routes API). Domaine/wheel/timeline/spin-mode/rotation-resume/golden/exports INTACTS. 🔶 EN ATTENTE passe humaine : `npx supabase db push` (table à créer — décision Solo) puis relancer le test live confirmed-rolls.write.integration (attendu 370/370) + contrôle navigateur.
+# 2026-06-25 — Story 5.10 contextée (Amelia/create-story) : NOUVELLE story HORS epics.md (échange Solo) → ready-for-dev ; rattachée à l'Epic 5 (déjà in-progress), prolonge la persistance 5.6. Journal d'audit `confirmed_rolls` : écriture à la VALIDATION (handleRevealed, bloc if(r)), pas au roll. Table MULTI-LIGNES PK composite (seed,date) — idempotent par génération, append au re-roll ; WRITE-ONLY (≠ singleton 5.6) : aucun Realtime/reducer/slice/reconcile. Décisions Solo : (1) audit PASSIF — 0 impact affichage/re-roll, recompute-from-seed intact (5.6 AC-2) ; (2) AUCUN verrou (pas de re-roll partiel) ; (3) clé (seed,date) pour préserver l'historique des re-rolls ; (4) name+participant_id snapshot dénormalisé, AUCUNE FK cascade (survit suppression participant). Best-effort silent (AC-6). date=text YMD (pas type date → anti-UTC). Cœur pur lib/ui/confirmed-roll.ts = ancre TDD. Périmètre : migration + route + lib/data + lib/ui + store(recordConfirmedRoll, no-op si seed null) + ScheduleResult + tests (unit + write integration). Domaine/wheel/timeline/spin-mode/rotation-resume/golden/exports INTACTS. À FAIRE passe humaine : supabase db push + contrôle navigateur.
 # 2026-06-22 — Story 1.5 implémentée (Amelia/dev-story) : ready-for-dev → review.
 # 2026-06-22 — Story 2.1 contextée (Amelia/create-story) : backlog → ready-for-dev ; epic-2 backlog → in-progress (1ère story).
 # 2026-06-22 — Story 2.1 démarrée (Amelia/dev-story) : ready-for-dev → in-progress.
@@ -135,4 +138,5 @@ development_status:
   5-7-exports-slack-csv-avec-apercu: review
   5-8-microcopie-branding-accessibilite-mouvement: review
   5-9-navigation-edition-rapide-entre-etapes: review
+  5-10-journal-audit-rolls-valides: review
   epic-5-retrospective: optional

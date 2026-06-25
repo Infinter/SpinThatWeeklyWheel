@@ -51,6 +51,7 @@ export function ScheduleResult() {
     rotationMode,
     persistRotationCursor,
     persistRotationMode,
+    recordConfirmedRoll,
   } = useParticipants()
   const activeCount = participants.filter((p) => p.active).length
   const canGenerate = activeCount > 0
@@ -212,6 +213,10 @@ export function ScheduleResult() {
         setRevealMessage(`${r.name} animera le standup du ${formatDateFr(r.date)}`)
         if (justPickedTimer.current) clearTimeout(justPickedTimer.current)
         justPickedTimer.current = setTimeout(() => setJustRevealedDate(null), 900)
+        // Journal d'audit (Story 5.10) : enregistre CE roll à sa validation, pour CHAQUE slot révélé et dans
+        // les DEUX modes — placé AVANT le branchement shouldChainNext (≠ granularité du curseur 5.6). Passif
+        // et best-effort : n'altère ni l'animation ni la persistance du curseur ci-dessous.
+        recordConfirmedRoll(r)
       }
       const len = schedule?.planning.length ?? 0
       if (shouldChainNext(mode, nextCount, len)) {
@@ -234,7 +239,7 @@ export function ScheduleResult() {
         }
       }
     },
-    [schedule, mode, persistRotationCursor],
+    [schedule, mode, persistRotationCursor, recordConfirmedRoll],
   )
 
   // ── Exports (Story 5.7, FR17/UX-DR11) ────────────────────────────────────────

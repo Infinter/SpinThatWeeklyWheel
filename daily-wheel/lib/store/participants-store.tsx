@@ -59,9 +59,12 @@ import {
   generateSchedule,
   type ScheduleInput,
   type ScheduleResult,
+  type ScheduleRow,
 } from '@/lib/domain/schedule'
 import { createRng } from '@/lib/domain/rng'
 import { scheduleSignature } from '@/lib/ui/schedule-signature'
+import { buildConfirmedRollPayload } from '@/lib/ui/confirmed-roll'
+import { writeConfirmedRoll } from '@/lib/data/confirmed-rolls'
 import { todayYMD } from '@/lib/format/date-fr'
 import { parseNames } from '@/lib/store/parse-names'
 import { useWriteQueue } from '@/lib/store/use-write-queue'
@@ -202,6 +205,9 @@ type StoreValue = {
   persistRotationCursor: (cursor: number) => void
   // Persiste le mode ET remet le curseur à 0 (changement de mode = reset, cohérent 5.5 AC-6).
   persistRotationMode: (mode: SpinMode) => void
+  // Journal d'audit (Story 5.10) : enregistre un roll À LA VALIDATION (révélation) d'un slot. PASSIF
+  // (n'influence ni l'affichage ni le re-roll), best-effort silencieux, no-op si aucune rotation persistée.
+  recordConfirmedRoll: (row: ScheduleRow) => void
   error: string | null
   clearError: () => void
   passphraseNeeded: boolean
@@ -799,6 +805,27 @@ export function ParticipantsStoreProvider({
     [updateRotationState],
   )
 
+  // ── Journal d'audit des rolls validés (Story 5.10) ─────────────────────────────────────────────
+  // Appelé par le composant Spin À LA VALIDATION (révélation) d'un slot, pour CHAQUE slot révélé, dans les
+  // deux modes (≠ granularité du curseur). Estampille le roll avec le seed COURANT (lu via stateRefR) et
+  // l'écrit dans `confirmed_rolls` (clé composite (seed,date) → idempotent par génération, append au re-roll).
+  // WRITE-ONLY : aucun état store à muter (onConfirm/rollback no-op). BEST-EFFORT silencieux (AC-6) : un
+  // échec ne nagge pas. NO-OP si aucune rotation persistée (seed null, AC-8) : rien à estampiller.
+  const recordConfirmedRoll = useCallback(
+    (row: ScheduleRow) => {
+      const seed = stateRefR.current.seed
+      if (seed == null) return
+      void runWrite({
+        write: (pp) => writeConfirmedRoll(buildConfirmedRollPayload(seed, row), pp),
+        onConfirm: () => {},
+        rollback: () => {},
+        retryKey: 'confirmed_rolls',
+        silent: true,
+      })
+    },
+    [runWrite],
+  )
+
   // ── Génération du planning (Story 4.2, FR11/FR14 ; PERSISTANT depuis 5.6) ──────────────────────
   // Calcul client PUR : assemble l'entrée du domaine (buildScheduleInput), tire un seed ALÉATOIRE
   // (Math.random AUTORISÉ ici — hors de la feuille domaine, AD-2), appelle `generateSchedule`, pose le
@@ -1093,6 +1120,7 @@ export function ParticipantsStoreProvider({
     rotationMode: rotationState.mode,
     persistRotationCursor,
     persistRotationMode,
+    recordConfirmedRoll,
     error,
     clearError,
     passphraseNeeded,
