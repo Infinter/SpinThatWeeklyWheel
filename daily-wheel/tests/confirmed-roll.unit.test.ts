@@ -47,10 +47,13 @@ describe('validateConfirmedRoll (Story 5.10, AC-7/AC-9a — validation défensiv
     expect(validateConfirmedRoll({ date: '2026-06-25', participant_id: 'p-1', name: 'A' })).not.toBeNull()
   })
 
-  it('rejette date absente / vide / non-string', () => {
+  it('rejette date absente / vide / non-string / format non-YMD', () => {
     expect(validateConfirmedRoll({ seed: 1, date: '', participant_id: 'p-1', name: 'A' })).not.toBeNull()
     expect(validateConfirmedRoll({ seed: 1, participant_id: 'p-1', name: 'A' })).not.toBeNull()
     expect(validateConfirmedRoll({ seed: 1, date: 20260625, participant_id: 'p-1', name: 'A' })).not.toBeNull()
+    // Chaîne non vide mais hors format YMD (date = composante de PK → ne doit pas devenir une clé corrompue).
+    expect(validateConfirmedRoll({ seed: 1, date: 'not-a-date', participant_id: 'p-1', name: 'A' })).not.toBeNull()
+    expect(validateConfirmedRoll({ seed: 1, date: '25/06/2026', participant_id: 'p-1', name: 'A' })).not.toBeNull()
   })
 
   it('rejette participant_id absent / vide', () => {

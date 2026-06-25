@@ -35,8 +35,8 @@ export function validateConfirmedRoll(picked: Record<string, unknown>): string |
   if (typeof s !== 'number' || !Number.isInteger(s) || s < 0 || s > UINT32_MAX) {
     return 'seed doit être un entier dans [0, 2^32-1]'
   }
-  if (typeof picked.date !== 'string' || picked.date.length === 0) {
-    return 'date doit être une chaîne YMD non vide'
+  if (typeof picked.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(picked.date)) {
+    return 'date doit être une chaîne au format YMD (YYYY-MM-DD)'
   }
   if (typeof picked.participant_id !== 'string' || picked.participant_id.length === 0) {
     return 'participant_id doit être une chaîne non vide'

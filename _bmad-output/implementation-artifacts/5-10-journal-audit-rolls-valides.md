@@ -4,7 +4,7 @@ baseline_commit: b61cf4d3a0eb64728100037569ba754c935217f9
 
 # Story 5.10: Journal d'audit des rolls validés (`confirmed_rolls`)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -61,6 +61,11 @@ so that l'historique « qui a animé le standup de quelle date » survive aux re
 - [x] **Task 8 — Vérifications finales**
   - [x] `tsc` 0 erreur, `eslint` 0, suite Vitest verte (domaine/golden/wheel/timeline/spin-mode/rotation-resume/exports INTACTS), `build` OK.
   - [x] Passe humaine : appliquer la migration (`supabase db push`) ; contrôle navigateur (un spin en chaque mode écrit bien les lignes ; échec d'écriture ne nagge pas).
+
+### Review Findings (code review 2026-06-25)
+
+- [x] [Review][Patch] `retryKey: 'confirmed_rolls'` partagé sur une table MULTI-LIGNES — clé conceptuellement fausse (calquée du singleton `rotation_state`). Bénin en pratique (une écriture `silent` n'est jamais rejouée : `retry()` ne part que de la bannière, supprimée par `silent`), mais fait churner une entrée morte dans `failedWritesRef`. Fix sans ambiguïté : `retryKey: null` (fire-and-forget assumé). [lib/store/participants-store.tsx → recordConfirmedRoll]
+- [x] [Review][Patch] `validateConfirmedRoll` ne vérifie pas le FORMAT YMD de `date` — le message d'erreur annonce « chaîne YMD non vide » mais n'accepte que « non vide ». Défensif uniquement (le client envoie toujours un `ScheduleRow.date` du domaine), mais `date` est composante de PK : une chaîne malformée deviendrait une clé permanente. Fix sans ambiguïté : ajouter un test `/^\d{4}-\d{2}-\d{2}$/`. [lib/ui/confirmed-roll.ts → validateConfirmedRoll]
 
 ## Dev Notes
 
@@ -148,6 +153,7 @@ claude-opus-4-8[1m] (Amelia / dev-story)
 ### Change Log
 
 - 2026-06-25 — Story 5.10 implémentée (Amelia/dev-story) : journal d'audit `confirmed_rolls` (écriture à la validation). 4 fichiers créés (migration, route, data-access, cœur pur), 2 modifiés (store, ScheduleResult), 2 fichiers de tests (+9 unit, +1 intégration). tsc 0 / eslint 0 / 369 tests verts (+ 1 intégration live en attente de migration) / build OK.
+- 2026-06-25 — Revue de code (Amelia/code-review, 3 couches) : 0 decision-needed, 2 patches LOW appliqués, 9 écartées. Patch 1 : `retryKey: null` (journal multi-lignes fire-and-forget ≠ singleton). Patch 2 : validation du format YMD de `date` (`/^\d{4}-\d{2}-\d{2}$/`) + 2 assertions de test. tsc 0 / eslint 0 / 370 tests verts. Aucun bug bloquant ; statut → done.
 
 ### File List
 

@@ -811,6 +811,9 @@ export function ParticipantsStoreProvider({
   // l'écrit dans `confirmed_rolls` (clé composite (seed,date) → idempotent par génération, append au re-roll).
   // WRITE-ONLY : aucun état store à muter (onConfirm/rollback no-op). BEST-EFFORT silencieux (AC-6) : un
   // échec ne nagge pas. NO-OP si aucune rotation persistée (seed null, AC-8) : rien à estampiller.
+  // `retryKey: null` (≠ singleton rotation_state) : journal MULTI-LIGNES en fire-and-forget assumé — une
+  // écriture silencieuse n'est jamais rejouée (retry part de la bannière, supprimée par silent), et une clé
+  // partagée entre lignes distinctes serait conceptuellement fausse.
   const recordConfirmedRoll = useCallback(
     (row: ScheduleRow) => {
       const seed = stateRefR.current.seed
@@ -819,7 +822,7 @@ export function ParticipantsStoreProvider({
         write: (pp) => writeConfirmedRoll(buildConfirmedRollPayload(seed, row), pp),
         onConfirm: () => {},
         rollback: () => {},
-        retryKey: 'confirmed_rolls',
+        retryKey: null,
         silent: true,
       })
     },
