@@ -18,6 +18,7 @@ export const DEFAULT_ROTATION_STATE: RotationState = {
   seed: null,
   cursor: 0,
   mode: 'rotation-complete',
+  start_date: null, // aucune ancre tant qu'aucune rotation n'est tirée (Story 5.17)
   updated_at: '',
 }
 

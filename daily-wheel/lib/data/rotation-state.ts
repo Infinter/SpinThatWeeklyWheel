@@ -14,6 +14,9 @@ export type RotationState = {
   seed: number | null // null = aucune rotation tirée ; sinon entier uint32 (colonne bigint, JS-safe < 2^53)
   cursor: number // = revealedCount (jours déjà révélés)
   mode: SpinMode
+  // Story 5.17 (fix décalage) : date d'ANCRAGE résolue du tirage (YMD text, anti-UTC). `null` = aucune
+  // ancre persistée (rotation antérieure au fix / avant tout tirage) → le replay retombe sur le défaut.
+  start_date: string | null
   // Timestamp sérialisé en chaîne ISO par PostgREST — JAMAIS typé `Date` (convention dates).
   updated_at: string
 }
@@ -37,6 +40,7 @@ export type RotationStateWritePayload = {
   seed?: number
   cursor?: number
   mode?: SpinMode
+  start_date?: string // YMD ; date d'ancrage résolue du tirage (Story 5.17)
 }
 
 // Envoie un upsert au proxy serveur, gardé par la passphrase d'équipe (header x-team-passphrase).

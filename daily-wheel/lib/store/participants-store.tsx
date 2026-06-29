@@ -63,6 +63,7 @@ import {
 } from '@/lib/domain/schedule'
 import { createRng } from '@/lib/domain/rng'
 import { scheduleSignature } from '@/lib/ui/schedule-signature'
+import { resolveReplayStartDate } from '@/lib/ui/rotation-resume'
 import { buildConfirmedRollPayload } from '@/lib/ui/confirmed-roll'
 import { writeConfirmedRoll } from '@/lib/data/confirmed-rolls'
 import { todayYMD } from '@/lib/format/date-fr'
@@ -112,7 +113,14 @@ function toServerSetting(s: StoreSetting): Setting {
 }
 // Snapshot rotation_state (sans pending/failed) pour les rollbacks RESTORE (Story 5.6).
 function toServerRotationState(r: StoreRotationState): RotationState {
-  return { id: r.id, seed: r.seed, cursor: r.cursor, mode: r.mode, updated_at: r.updated_at }
+  return {
+    id: r.id,
+    seed: r.seed,
+    cursor: r.cursor,
+    mode: r.mode,
+    start_date: r.start_date,
+    updated_at: r.updated_at,
+  }
 }
 
 // Assemble l'entrée du domaine (actifs + indispos + contraintes d'équipe + date de début) depuis les
@@ -263,41 +271,34 @@ export function ParticipantsStoreProvider({
     (initialRotationState ?? DEFAULT_ROTATION_STATE) as StoreRotationState,
   )
   const [error, setError] = useState<string | null>(null)
-  // Résultat de génération (Story 4.2 ; PERSISTANT depuis 5.6). REPRISE au montage : si une graine est
-  // persistée (seed != null), on RECALCULE le planning à l'identique (déterminisme NFR7) depuis les
-  // entrées initiales — jamais un planning figé (AC-2). Sinon `null` (aucune rotation tirée). Lazy
-  // initializer (pur, idempotent SSR/client tant que les entrées et la graine sont stables).
+  // Entrée de REPRISE au montage (Story 5.6, durcie 5.17). Si une graine est persistée (seed != null),
+  // on construit l'input du domaine UNE fois et on l'ANCRE sur la date persistée (`start_date`) plutôt
+  // que sur `todayYMD()` — sinon le planning « glissait » sur le jour courant à chaque rechargement
+  // (bug 5.17). `null` si aucune rotation tirée. Partagé par le schedule ET sa signature (5.9) pour que
+  // les deux reflètent la MÊME ancre (sinon faux positif rerun-nudge).
+  const initialReplay = (() => {
+    if (!initialRotationState || initialRotationState.seed == null) return null
+    const input = buildScheduleInput(
+      initial as StoreParticipant[],
+      initialUnavailabilities as StoreUnavailability[],
+      initialGroupExclusions as StoreGroupExclusion[],
+      initialHolidays as StoreHoliday[],
+      initialTeamOffDays as StoreTeamOffDay[],
+      (initialSettings ?? DEFAULT_SETTING) as StoreSetting,
+    )
+    input.startDate = resolveReplayStartDate(initialRotationState.start_date, input.startDate)
+    return { input, seed: initialRotationState.seed }
+  })()
+  // Résultat de génération (Story 4.2 ; PERSISTANT depuis 5.6). RECALCUL déterministe (NFR7) depuis
+  // l'input de reprise ancré — jamais un planning figé (AC-2). Lazy initializer pur, idempotent SSR/client.
   const [schedule, setSchedule] = useState<ScheduleResult | null>(() =>
-    initialRotationState && initialRotationState.seed != null
-      ? generateSchedule(
-          buildScheduleInput(
-            initial as StoreParticipant[],
-            initialUnavailabilities as StoreUnavailability[],
-            initialGroupExclusions as StoreGroupExclusion[],
-            initialHolidays as StoreHoliday[],
-            initialTeamOffDays as StoreTeamOffDay[],
-            (initialSettings ?? DEFAULT_SETTING) as StoreSetting,
-          ),
-          createRng(initialRotationState.seed),
-        )
-      : null,
+    initialReplay ? generateSchedule(initialReplay.input, createRng(initialReplay.seed)) : null,
   )
   // Signature des contraintes au moment où le `schedule` courant a été produit (Story 5.9, rerun-nudge).
-  // Figée à chaque (re)génération et à la reprise depuis seed ; comparée à la signature COURANTE à chaque
-  // rendu pour dériver `scheduleStale`. `null` tant qu'aucun planning n'existe.
+  // Figée à la reprise depuis seed (même input ancré) ; comparée à la signature COURANTE à chaque rendu
+  // pour dériver `scheduleStale`. `null` tant qu'aucun planning n'existe.
   const [signatureAtGenerate, setSignatureAtGenerate] = useState<string | null>(() =>
-    initialRotationState && initialRotationState.seed != null
-      ? scheduleSignature(
-          buildScheduleInput(
-            initial as StoreParticipant[],
-            initialUnavailabilities as StoreUnavailability[],
-            initialGroupExclusions as StoreGroupExclusion[],
-            initialHolidays as StoreHoliday[],
-            initialTeamOffDays as StoreTeamOffDay[],
-            (initialSettings ?? DEFAULT_SETTING) as StoreSetting,
-          ),
-        )
-      : null,
+    initialReplay ? scheduleSignature(initialReplay.input) : null,
   )
 
   // File d'écriture partagée + passphrase (extraite en 3.2). TABLE-AGNOSTIQUE : un seul prompt pour N (AD-8).
@@ -847,7 +848,9 @@ export function ParticipantsStoreProvider({
     setSchedule(generateSchedule(input, createRng(seed)))
     // Fige la signature des entrées AYANT produit ce planning (même `input`) ⇒ scheduleStale=false (5.9).
     setSignatureAtGenerate(scheduleSignature(input))
-    updateRotationState({ seed, cursor: 0 })
+    // Story 5.17 : persiste la date d'ANCRAGE RÉSOLUE (input.startDate = settings.start_date ?? today),
+    // pour que la reprise rejoue le planning sur cette date — et non sur le jour courant (fix décalage).
+    updateRotationState({ seed, cursor: 0, start_date: input.startDate })
   }, [
     participants,
     unavailabilities,
@@ -1029,7 +1032,10 @@ export function ParticipantsStoreProvider({
   useEffect(() => {
     // Recalcule le planning depuis une graine (déterminisme NFR7) en lisant les entrées COURANTES via
     // les refs miroir (toujours à jour, hors closure). Utilisé à l'abonnement et sur changement de graine.
-    const recomputeFromSeed = (seed: number | null | undefined) => {
+    // Story 5.17 : `anchor` (start_date persisté) est passé EXPLICITEMENT, pas lu via `stateRefR` — la ref
+    // miroir n'est mise à jour qu'après re-rendu (useEffect), donc au moment d'un écho Realtime elle porte
+    // encore l'ancienne valeur ; l'ancre fraîche est dans `event.new.start_date`. Absente ⇒ fallback today.
+    const recomputeFromSeed = (seed: number | null | undefined, anchor: string | null | undefined) => {
       if (seed == null) return
       const input = buildScheduleInput(
         stateRef.current,
@@ -1039,6 +1045,7 @@ export function ParticipantsStoreProvider({
         stateRefO.current,
         stateRefS.current,
       )
+      input.startDate = resolveReplayStartDate(anchor, input.startDate)
       setSchedule(generateSchedule(input, createRng(seed)))
       // Relance venue d'un autre poste = NOUVEAU planning aligné sur les contraintes courantes ⇒ non
       // périmé : on re-fige la signature (5.9). Sinon le nudge s'afficherait à tort après une relance distante.
@@ -1057,7 +1064,7 @@ export function ParticipantsStoreProvider({
           // Recalcul UNIQUEMENT si la GRAINE change (un autre poste a (re)lancé) : un écho de curseur/mode
           // garde la même graine → on NE recalcule PAS (sinon on réinitialiserait la vue locale à tort).
           if (event.eventType !== 'DELETE' && event.new?.seed != null && event.new.seed !== prevSeed) {
-            recomputeFromSeed(event.new.seed)
+            recomputeFromSeed(event.new.seed, event.new.start_date)
           }
         },
       )
@@ -1067,7 +1074,7 @@ export function ParticipantsStoreProvider({
             .then((row) => {
               const prevSeed = stateRefR.current.seed
               dispatchR({ type: 'HYDRATE', row })
-              if (row?.seed != null && row.seed !== prevSeed) recomputeFromSeed(row.seed)
+              if (row?.seed != null && row.seed !== prevSeed) recomputeFromSeed(row.seed, row.start_date)
             })
             .catch(() => {
               /* refetch impossible : un prochain SUBSCRIBED réessaiera. */

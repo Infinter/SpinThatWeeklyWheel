@@ -20,3 +20,17 @@ export function clampCursor(cursor: number, planningLen: number): number {
   if (!Number.isFinite(cursor) || cursor < 0) return 0
   return Math.min(Math.trunc(cursor), planningLen)
 }
+
+// Story 5.17 (BUG FIX) — résout la date d'ANCRAGE du replay. Le bug : la rotation persistée ne figeait
+// que le seed ; au replay, `startDate` retombait sur `todayYMD()`, ré-ancrant tout le planning sur le
+// jour courant (les jours « glissaient »). On persiste désormais la date résolue au tirage dans
+// `rotation_state.start_date` et on la rejoue ici. `persisted` PRIME ; on retombe sur `fallback`
+// (= settings.start_date ?? todayYMD(), comportement 5.6) UNIQUEMENT si l'ancre est absente (null /
+// undefined / chaîne vide) — rotation antérieure au fix ou colonne non encore hydratée (dégradation
+// gracieuse, AC-4). PUR : aucune dépendance ; testé sans réseau.
+export function resolveReplayStartDate(
+  persisted: string | null | undefined,
+  fallback: string,
+): string {
+  return persisted ? persisted : fallback
+}

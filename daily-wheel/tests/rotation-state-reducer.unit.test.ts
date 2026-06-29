@@ -18,6 +18,7 @@ function r(over: Partial<StoreRotationState> = {}): StoreRotationState {
     seed: 1234567,
     cursor: 0,
     mode: 'rotation-complete',
+    start_date: '2026-06-22',
     updated_at: '2026-06-24T10:00:00+00:00',
     ...over,
   }
@@ -26,11 +27,12 @@ function r(over: Partial<StoreRotationState> = {}): StoreRotationState {
 describe('rotationStateReducer — transitions optimistes scalaires (AD-5)', () => {
   it('HYDRATE avec une ligne serveur → la remplace (drapeaux effacés)', () => {
     const state = r({ cursor: 0, pending: true })
-    const row: RotationState = { id: 'singleton', seed: 42, cursor: 3, mode: 'jour-le-jour', updated_at: 'x' }
+    const row: RotationState = { id: 'singleton', seed: 42, cursor: 3, mode: 'jour-le-jour', start_date: '2026-06-29', updated_at: 'x' }
     const next = rotationStateReducer(state, { type: 'HYDRATE', row })
     expect(next.seed).toBe(42)
     expect(next.cursor).toBe(3)
     expect(next.mode).toBe('jour-le-jour')
+    expect(next.start_date).toBe('2026-06-29') // Story 5.17 : l'ancre transite par HYDRATE
     expect(next.pending).toBeFalsy()
   })
 
@@ -71,7 +73,7 @@ describe('rotationStateReducer — transitions optimistes scalaires (AD-5)', () 
 
   it('CONFIRM : remplace par la ligne serveur (drapeaux effacés)', () => {
     const state = r({ pending: true })
-    const row: RotationState = { id: 'singleton', seed: 7, cursor: 1, mode: 'jour-le-jour', updated_at: 'srv' }
+    const row: RotationState = { id: 'singleton', seed: 7, cursor: 1, mode: 'jour-le-jour', start_date: '2026-06-29', updated_at: 'srv' }
     const next = rotationStateReducer(state, { type: 'CONFIRM', row })
     expect(next.updated_at).toBe('srv')
     expect(next.cursor).toBe(1)
@@ -86,7 +88,7 @@ describe('rotationStateReducer — transitions optimistes scalaires (AD-5)', () 
 
   it('RESTORE : revient au snapshot fourni (drapeaux effacés)', () => {
     const state = r({ cursor: 5, pending: true, failed: true })
-    const snapshot: RotationState = { id: 'singleton', seed: 1234567, cursor: 2, mode: 'rotation-complete', updated_at: 'snap' }
+    const snapshot: RotationState = { id: 'singleton', seed: 1234567, cursor: 2, mode: 'rotation-complete', start_date: '2026-06-22', updated_at: 'snap' }
     const next = rotationStateReducer(state, { type: 'RESTORE', row: snapshot })
     expect(next.cursor).toBe(2)
     expect(next.pending).toBeFalsy()
@@ -104,25 +106,25 @@ describe('rotationStateReducer — transitions optimistes scalaires (AD-5)', () 
 describe('reconcileRotationState — LWW une-ligne (AD-15/AD-16)', () => {
   it('écho (même updated_at) → état inchangé (AD-15)', () => {
     const state = r({ updated_at: '2026-06-24T10:00:00+00:00' })
-    const echo: RotationState = { id: 'singleton', seed: 1, cursor: 9, mode: 'jour-le-jour', updated_at: '2026-06-24T10:00:00+00:00' }
+    const echo: RotationState = { id: 'singleton', seed: 1, cursor: 9, mode: 'jour-le-jour', start_date: '2026-06-22', updated_at: '2026-06-24T10:00:00+00:00' }
     expect(reconcileRotationState(state, { eventType: 'UPDATE', new: echo })).toBe(state)
   })
 
   it('updated_at plus récent → appliqué (un autre poste a avancé/relancé)', () => {
     const state = r({ updated_at: '2026-06-24T10:00:00+00:00' })
-    const incoming: RotationState = { id: 'singleton', seed: 55, cursor: 1, mode: 'jour-le-jour', updated_at: '2026-06-24T11:00:00+00:00' }
+    const incoming: RotationState = { id: 'singleton', seed: 55, cursor: 1, mode: 'jour-le-jour', start_date: '2026-06-29', updated_at: '2026-06-24T11:00:00+00:00' }
     expect(reconcileRotationState(state, { eventType: 'UPDATE', new: incoming })).toBe(incoming)
   })
 
   it('updated_at plus ancien → ignoré', () => {
     const state = r({ updated_at: '2026-06-24T12:00:00+00:00' })
-    const stale: RotationState = { id: 'singleton', seed: 2, cursor: 0, mode: 'rotation-complete', updated_at: '2026-06-24T09:00:00+00:00' }
+    const stale: RotationState = { id: 'singleton', seed: 2, cursor: 0, mode: 'rotation-complete', start_date: '2026-06-22', updated_at: '2026-06-24T09:00:00+00:00' }
     expect(reconcileRotationState(state, { eventType: 'UPDATE', new: stale })).toBe(state)
   })
 
   it('INSERT (1ʳᵉ création par un autre client) → appliqué', () => {
     const state = r({ updated_at: '' })
-    const incoming: RotationState = { id: 'singleton', seed: 3, cursor: 0, mode: 'rotation-complete', updated_at: '2026-06-24T11:00:00+00:00' }
+    const incoming: RotationState = { id: 'singleton', seed: 3, cursor: 0, mode: 'rotation-complete', start_date: null, updated_at: '2026-06-24T11:00:00+00:00' }
     expect(reconcileRotationState(state, { eventType: 'INSERT', new: incoming })).toBe(incoming)
   })
 
@@ -133,7 +135,7 @@ describe('reconcileRotationState — LWW une-ligne (AD-15/AD-16)', () => {
 
   it('id ≠ singleton → ignoré', () => {
     const state = r()
-    const incoming: RotationState = { id: 'autre', seed: 1, cursor: 0, mode: 'rotation-complete', updated_at: '2026-06-24T11:00:00+00:00' }
+    const incoming: RotationState = { id: 'autre', seed: 1, cursor: 0, mode: 'rotation-complete', start_date: null, updated_at: '2026-06-24T11:00:00+00:00' }
     expect(reconcileRotationState(state, { eventType: 'UPDATE', new: incoming })).toBe(state)
   })
 })

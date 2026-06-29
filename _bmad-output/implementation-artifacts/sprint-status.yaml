@@ -41,13 +41,15 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-06-22
-last_updated: 2026-06-25
+last_updated: 2026-06-29
 project: SpinThatWeeklyWheel
-# (last_updated reflète la création Story 5.10 → ready-for-dev)
+# (last_updated reflète Story 5.17 implémentée → review)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
 
+# 2026-06-29 — Story 5.17 implémentée (Amelia/dev-story) : in-progress → review. Fix décalage des jours. Colonne rotation_state.start_date (migration 20260629120000 + backfill roll en cours à '2026-06-29' — décision Solo) ; contrat data/reducer/route étendus (allowlist + validation YMD) ; generate() persiste l'ancre résolue ; replay ancré aux 2 sites (montage initialReplay + recomputeFromSeed(seed, anchor) — ancre passée EXPLICITEMENT, pas via ref miroir async) via helper pur resolveReplayStartDate ; toServerRotationState étendu (anti-perte au rollback). generateSchedule PUR inchangé (déterminisme NFR7). +6 tests (helper ×4, garde domaine même-seed/2-startDate, transit HYDRATE) + fixtures reducer. tsc 0 / eslint 0 / 376 tests / build OK. Domaine/wheel/timeline/spin-mode/exports/golden INTACTS. Migration 20260629120000 APPLIQUÉE en distant (autorisée Solo) + vérifiée REST : singleton.start_date='2026-06-29' (roll en cours ré-ancré à aujourd'hui, ne glisse plus). ⏳ Reste contrôle navigateur (Solo). À noter au retro Epic 5 : régression latente 5.6.
+# 2026-06-29 — Story 5.17 contextée (Amelia/create-story) : BUG FIX tracé comme tel → ready-for-dev (epic-5 déjà in-progress). Suite à investigation (case file investigations/roll-date-shift-investigation.md) : root cause CONFIRMÉ du décalage des jours d'un roll figé. La reprise 5.6 persiste seed+cursor+mode mais PAS la date d'ancrage ; buildScheduleInput résout startDate = settings.start_date ?? todayYMD() (participants-store.tsx:148, settings.start_date=null par défaut) ⇒ replay (montage :270-283 + recomputeFromSeed :1032-1042) ré-ancre le planning sur today à chaque reload. Régression latente 5.6 (migration appliquée le 25/06) exposée par la reprise + best-effort 5.16. Fix retenu (option 1) : colonne rotation_state.start_date (text YMD nullable), écrite par generate() avec input.startDate résolu, lue au replay (surcharge input.startDate ; generateSchedule PUR inchangé). Périmètre : migration + lib/data/rotation-state + reducer DEFAULT + reconcile (vérif) + route allowlist/validate + store (generate + 2 sites replay + signature) + helper pur resolveReplayStartDate (rotation-resume.ts) + tests (domaine même-seed/2-startDate + helper). À FAIRE passe humaine : supabase db push + VÉRIF distant (mémoire supabase-migration-apply) + contrôle navigateur. À noter au retro Epic 5 (régression latente 5.6).
 # 2026-06-25 — Stories 5.11 + 5.12 documentées rétroactivement (Amelia) : changements faits en quick-flow puis formalisés en stories `done`. 5.11 = durée de rotation roue 2100→1200 ms (SpinWheel.tsx, commit 7520ef0). 5.12 = timeline alignée grille calendaire lun→dim, dimanche en fin de ligne, décalage 1re cellule via mondayIndex/--first-col, reflux auto-fit ≤520px (date-fr/ScheduleTimeline/globals.css, +1 test, commit 20dc6a1). buildTimeline intact. tsc 0 / eslint 0 / 371 tests verts.
 # 2026-06-25 — Story 5.10 revue (Amelia/code-review, 3 couches adversariales) : review → done. 0 decision-needed, 2 patches LOW appliqués (retryKey:null pour journal multi-lignes ; validation format YMD de date), 9 findings écartés (rejeu reload bénin, desync seed auto-mitigé, etc.). tsc 0 / eslint 0 / 370 tests verts. Aucun bug bloquant.
 # 2026-06-25 — Passe humaine 5.10 (Amelia, autorisée Solo) : `supabase db push` appliqué. DÉCOUVERTE : la migration rotation_state (5.6) n'avait JAMAIS été appliquée en prod (REST 404) → persistance 5.6 silencieusement KO depuis le 24/06. Push a appliqué les DEUX migrations (rotation_state + confirmed_rolls, tables absentes, aucun conflit) → 200/200. Suite complète 370/370 vert (live confirmed-rolls.write.integration inclus). RESTE : contrôle navigateur + vérifier que la reprise rotation 5.6 fonctionne enfin. Régression latente 5.6 à noter au prochain retro.
@@ -149,4 +151,5 @@ development_status:
   5-14-stepper-commutateur-une-etape: done
   5-15-stepper-restyle-ombre-filet: done
   5-16-persistance-rotation-best-effort: done
+  5-17-fix-ancrage-date-rotation-persistee: review
   epic-5-retrospective: optional

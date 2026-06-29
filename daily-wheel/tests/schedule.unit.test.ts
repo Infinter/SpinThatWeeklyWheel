@@ -393,3 +393,45 @@ describe('5.2 — horizon étendu & invariant nb sessions = nb dispos', () => {
     expect(r1.planning).toHaveLength(8)
   })
 })
+
+// ───────────────────────────────────────────────────────────────────────────────────────────
+// Story 5.17 (BUG FIX, AC-6) — GARDE DE RÉGRESSION du décalage des jours.
+// Le bug : la rotation persistée ne figeait QUE le seed ; au replay, `startDate` retombait sur
+// `todayYMD()`, ré-ancrant le planning sur le jour courant. Ce test verrouille le MÉCANISME : à seed
+// constant, deux `startDate` différents donnent les MÊMES animateurs DANS LE MÊME ORDRE (le seed fige
+// le tirage) mais à des DATES décalées (les dates découlent de `startDate`). C'est précisément pourquoi
+// l'ancrage DOIT être persisté et rejoué (et non recalculé depuis aujourd'hui).
+// Ancrage calendaire : 2026-06-26 = vendredi, 2026-06-29 = lundi suivant.
+// ───────────────────────────────────────────────────────────────────────────────────────────
+describe('Story 5.17 — ancrage : même seed, startDate différent → même ordre, dates décalées', () => {
+  const team: SchedulePerson[] = ['a', 'b', 'c'].map((id) => person(id, id.toUpperCase()))
+  const SEED = 4242
+
+  it('mêmes participantId dans le même ordre, mais dates différentes (planning ré-ancré)', () => {
+    const fromFriday = generateSchedule(
+      { participants: team, constraints: { skipWeekends: true }, startDate: '2026-06-26' },
+      createRng(SEED),
+    )
+    const fromMonday = generateSchedule(
+      { participants: team, constraints: { skipWeekends: true }, startDate: '2026-06-29' },
+      createRng(SEED),
+    )
+
+    // Toute l'équipe est planifiée dans les deux cas.
+    expect(fromFriday.planning).toHaveLength(3)
+    expect(fromMonday.planning).toHaveLength(3)
+
+    // Le seed fige l'ORDRE des animateurs : identique des deux côtés.
+    expect(fromMonday.planning.map((r) => r.participantId)).toEqual(
+      fromFriday.planning.map((r) => r.participantId),
+    )
+
+    // … mais les DATES diffèrent (c'est le glissement que l'ancrage persisté doit empêcher au replay).
+    expect(fromMonday.planning.map((r) => r.date)).not.toEqual(
+      fromFriday.planning.map((r) => r.date),
+    )
+    // Ancrage concret : 1er slot = le startDate fourni (jour ouvré).
+    expect(fromFriday.planning[0].date).toBe('2026-06-26')
+    expect(fromMonday.planning[0].date).toBe('2026-06-29')
+  })
+})

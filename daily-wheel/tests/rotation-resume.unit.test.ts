@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { replayRotation, clampCursor } from '@/lib/ui/rotation-resume'
+import { replayRotation, clampCursor, resolveReplayStartDate } from '@/lib/ui/rotation-resume'
 import type { ScheduleInput } from '@/lib/domain/schedule'
 
 // Test UNITAIRE pur (aucun réseau, aucune variable d'env) : il fixe l'invariant de REJOUABILITÉ de la
@@ -58,6 +58,21 @@ describe('replayRotation — déterminisme à graine constante (Story 5.6, AC-5)
     const b = replayRotation(input(), SEED + 1)
     expect(a.planning.length).toBe(b.planning.length) // même population planifiée
     // Pas d'assertion d'inégalité stricte (un seed voisin pourrait coïncider) — invariant = déterminisme.
+  })
+})
+
+describe('resolveReplayStartDate — ancrage persisté vs fallback (Story 5.17, AC-2/AC-4)', () => {
+  it('ancre persistée présente → renvoyée (le planning ne glisse plus avec today)', () => {
+    expect(resolveReplayStartDate('2026-06-26', '2026-06-29')).toBe('2026-06-26')
+  })
+  it('ancre persistée null → fallback (rotation antérieure au fix / colonne absente)', () => {
+    expect(resolveReplayStartDate(null, '2026-06-29')).toBe('2026-06-29')
+  })
+  it('ancre persistée undefined → fallback (défensif, colonne non hydratée)', () => {
+    expect(resolveReplayStartDate(undefined, '2026-06-29')).toBe('2026-06-29')
+  })
+  it('ancre persistée chaîne vide → fallback (valeur non significative)', () => {
+    expect(resolveReplayStartDate('', '2026-06-29')).toBe('2026-06-29')
   })
 })
 

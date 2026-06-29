@@ -9,9 +9,10 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 export const runtime = 'nodejs'
 
 // Allowlist de colonnes écrivables (AD-14). id (forcé 'singleton') / updated_at = serveur.
-const ALLOWED = ['seed', 'cursor', 'mode'] as const
+const ALLOWED = ['seed', 'cursor', 'mode', 'start_date'] as const
 const MODES = ['rotation-complete', 'jour-le-jour'] as const
 const UINT32_MAX = 0xffffffff
+const YMD = /^\d{4}-\d{2}-\d{2}$/
 
 type WriteBody = {
   op?: unknown
@@ -68,6 +69,12 @@ function validateUpsert(picked: Record<string, unknown>): string | null {
       return "mode doit être 'rotation-complete' ou 'jour-le-jour'"
     }
   }
+  if ('start_date' in picked) {
+    // Date d'ancrage (Story 5.17) : chaîne YMD (anti-UTC), même motif que confirmed_rolls.date.
+    if (typeof picked.start_date !== 'string' || !YMD.test(picked.start_date)) {
+      return 'start_date doit être une chaîne au format YMD (YYYY-MM-DD)'
+    }
+  }
   return null
 }
 
@@ -97,7 +104,9 @@ export async function POST(request: Request): Promise<Response> {
   // --- UPSERT : allowlist appliquée AVANT écriture (AD-14) + validation défensive (AD-17:400) ---
   const picked = pickAllowed(body.data)
   if (Object.keys(picked).length === 0) {
-    return json(400, { error: 'data vide après allowlist (colonnes autorisées : seed, cursor, mode)' })
+    return json(400, {
+      error: 'data vide après allowlist (colonnes autorisées : seed, cursor, mode, start_date)',
+    })
   }
   const invalid = validateUpsert(picked)
   if (invalid) return json(400, { error: invalid })
