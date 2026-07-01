@@ -11,3 +11,8 @@
 - Breakpoints responsives manquants entre 521–780px dans `globals.css:126` — à affiner au fil des stories.
 - Pas de `prefers-color-scheme: dark` dans `globals.css` — dark mode hors-scope Story 1.1.
 - Pas de headers de sécurité dans `next.config.ts:3` — à ajouter avant le déploiement production (Story 1.5 / Vercel).
+
+## Deferred from: code review of spec-personne-du-jour-bandeau (2026-07-01)
+
+- Contrat couleur PARTAGÉ vs roster périmé : si l'animateur du jour est désactivé/supprimé APRÈS le tirage, `buildColorIndexMap(active)` ne contient plus son id → la pastille retombe sur `colorForIndex(0)` (mauvaise couleur). Comportement IDENTIQUE dans `ScheduleTimeline` et `SpinWheel` — c'est le contrat couleur commun, pas une régression du bandeau. Atténué par le nudge de relance (5.9). À traiter globalement (bandeau + timeline + roue ensemble) si un jour on veut résoudre la couleur par id sur l'union actifs+plannifiés.
+- `todayYMD()` n'est recalculé qu'au re-render : un onglet laissé ouvert au passage de minuit continue d'afficher « aujourd'hui = hier » jusqu'à une MAJ du store / navigation. Pattern app-wide (todayYMD partout) — à traiter globalement si besoin (timer de minuit ou revalidation).

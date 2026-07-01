@@ -100,6 +100,57 @@ a { color: inherit; text-decoration: none; }
 }
 .lock b { color: var(--text-color); font-weight: 600; }
 
+/* ── Bandeau « personne du jour » (spec-personne-du-jour-bandeau) ──────────── */
+/* PERSISTANT sous le header : remonte l'animateur du standup d'aujourd'hui sans ouvrir l'étape Spin.
+   100 % variables CSS → suit le thème clair/sombre (Story 5.13). */
+.today-banner {
+  width: 100%;
+  max-width: 780px;
+  margin: 0 auto 1.4em;
+  display: flex;
+  align-items: center;
+  gap: .85em;
+  padding: .7em 1em;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-card);
+}
+.today-banner.is-revealed { border-left-color: var(--primary); }
+.today-banner.is-pending { border-left-color: var(--accent); }
+.today-banner.is-none { border-left-color: var(--border); }
+.today-banner .tb-av {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.05rem;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.today-banner .tb-av-muted {
+  background: var(--primary-light);
+  font-size: 1.25rem;
+}
+.today-banner .tb-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.today-banner .tb-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-color);
+}
+.today-banner .tb-sub {
+  font-size: .8rem;
+  color: var(--text-muted);
+}
+
 /* ── Parcours guidé : stepper collant (Story 5.1) ──────────────────────── */
 .stepper {
   width: 100%;

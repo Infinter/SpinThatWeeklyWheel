@@ -14,6 +14,7 @@ import { TeamOffDaysPanel } from '@/components/TeamOffDaysPanel'
 import { ScheduleResult } from '@/components/ScheduleResult'
 import { ProtectionBanner } from '@/components/ProtectionBanner'
 import { GuidedStepper } from '@/components/GuidedStepper'
+import { TodayStandupBanner } from '@/components/TodayStandupBanner'
 import { StepNavProvider, StepPanel } from '@/components/StepNav'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
@@ -70,6 +71,11 @@ export default async function Home() {
         {/* Bascule clair/sombre (2026-06-24). */}
         <ThemeToggle />
       </header>
+
+      {/* Bandeau « personne du jour » (spec-personne-du-jour-bandeau) : PERSISTANT sous le header, hors
+          StepNav → visible sur les 3 étapes. Remonte l'animateur du standup d'aujourd'hui sans ouvrir
+          l'étape Spin ni parcourir la timeline. Dans le provider store (le bandeau consomme le store). */}
+      <TodayStandupBanner />
 
       {/* Parcours guidé COLLANT : 1 Équipe · 2 Contraintes · 3 Spin. Commutateur d'étapes : une seule
           surface visible à la fois (décision Solo 2026-06-24, déviation assumée du « pas un wizard »). */}
